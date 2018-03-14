@@ -36,8 +36,8 @@ defmodule Bridge do # {
 # 3 = 47
 # 4 = 3023
 # 5 = 110439
-  @deck_size 3
-  @deck for x <- 0..3, y <- 2..4, do: {x, y}
+  @deck_size 2
+  @deck for x <- 0..3, y <- 2..3, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -288,12 +288,12 @@ defmodule Bridge do # {
   # When playable is nil (lead_suit will be NT), it means "LEAD A CARD" - get list of cards to play by calling playable(lead_suit, h1).
   #
   def play(gather, h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
-#    IO.puts " playA leader #{leader} #{seatStr(leader)}"
+    IO.puts " playA leader #{leader} #{seatStr(leader)} lead #{suitStr(lead_suit)}"
     play(gather, h1, h2, h3, h4, trumps, leader, playable(lead_suit, h1), round, lead_suit, position, hand, played)
   end # }
 
   def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
-#    IO.puts " playB leader #{leader} #{seatStr(leader)}"
+    IO.puts " playB leader #{leader} #{seatStr(leader)} lead #{suitStr(@nt)}"
 #    IO.write "Lead round #{round} leader #{leader} position #{position} card: #{cardStr(card)} h1: "
 #    IO.puts ""
 #    IO.inspect h1
@@ -309,7 +309,7 @@ defmodule Bridge do # {
   # Play a card to a lead
   #
   def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, lead_suit, position, hand, played) do # {
-#    IO.puts " playC leader #{leader} #{seatStr(leader)}"
+    IO.puts " playC leader #{leader} #{seatStr(leader)} lead #{suitStr(lead_suit)}"
 #    IO.write "Play round #{round} position #{position} card: #{cardStr(card)} h1: "
 #    IO.puts ""
 #    IO.inspect h1
