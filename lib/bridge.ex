@@ -215,7 +215,6 @@ defmodule Bridge do # {
   def wins(_trumps, [], winner, _pos, who), do: {winner, who}
   def wins(trumps, [hd|tl], nil, pos, who), do: wins(trumps, tl, hd, pos + 1, who)
   def wins(trumps, [try = {try_suit,try_rank}|tl], winner = {win_suit, win_rank}, pos, who), do: (
-    #IO.puts "wins #{trumps} #{cardStr(try)} vs #{cardStr(winner)} at #{pos} #{who}"
     cond do
       try_suit == win_suit && try_rank > win_rank -> wins(trumps, tl, try, pos + 1, pos)
       try_suit != win_suit && try_suit == trumps -> wins(trumps, tl, try, pos + 1, pos)
@@ -224,14 +223,10 @@ defmodule Bridge do # {
   )
 
   def gathering(plays\\[]) do
-    #IO.puts "gather"
     receive do
       {:add, aPlay} ->
-        #IO.write "Adding "
-        #IO.inspect aPlay
         gathering([aPlay|plays])
       {:give, sender} ->
-        #IO.puts "Giving "
         send sender, {:ok, plays}
     end
   end
@@ -259,10 +254,6 @@ defmodule Bridge do # {
   # end of play ... return reversed play
   # 
   def play(gather, _h1, _h2, _h3, _h4, _trumps, _leader, _playable, @deck_size, _lead_suit, _position, hand, _played) do
-#    IO.puts "End of Play"
-#    IO.write "  hand:"
-#    IO.inspect hand
-# the following is the real result
     send gather, {:add, reverse(hand)}
   end
 
@@ -271,11 +262,8 @@ defmodule Bridge do # {
   #
   def play(gather, h1, h2, h3, h4, trumps, leader, _playable, round, _lead_suit, 4, hand, played) do # {
     played = reverse(played)
-#    IO.write "XXXX leader #{seatStr(leader)} "
-#    show_cards(played)
     {_card, winner} = wins(trumps, played)
     winner = rem(leader + winner, 4)
-#    IO.puts "winner is #{cardStr(card)} from #{seatStr(winner)}"
     play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, nil, round + 1, @nt, 0, [{winner, played} | hand], [])
   end # }
 
@@ -288,15 +276,10 @@ defmodule Bridge do # {
   # When playable is nil (lead_suit will be NT), it means "LEAD A CARD" - get list of cards to play by calling playable(lead_suit, h1).
   #
   def play(gather, h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
-    IO.puts " playA leader #{leader} #{seatStr(leader)} lead #{suitStr(lead_suit)}"
     play(gather, h1, h2, h3, h4, trumps, leader, playable(lead_suit, h1), round, lead_suit, position, hand, played)
   end # }
 
   def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
-    IO.puts " playB leader #{leader} #{seatStr(leader)} lead #{suitStr(@nt)}"
-#    IO.write "Lead round #{round} leader #{leader} position #{position} card: #{cardStr(card)} h1: "
-#    IO.puts ""
-#    IO.inspect h1
 
     {lead_suit, _} = card
     new_h1 = remove_card(h1, card)
@@ -309,13 +292,8 @@ defmodule Bridge do # {
   # Play a card to a lead
   #
   def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, lead_suit, position, hand, played) do # {
-    IO.puts " playC leader #{leader} #{seatStr(leader)} lead #{suitStr(lead_suit)}"
-#    IO.write "Play round #{round} position #{position} card: #{cardStr(card)} h1: "
-#    IO.puts ""
-#    IO.inspect h1
     new_h1 = remove_card(h1, card)
     play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
-#    IO.puts "---"
       play(gather, h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
   end # }
 
