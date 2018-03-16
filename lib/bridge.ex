@@ -36,8 +36,8 @@ defmodule Bridge do # {
 # 3 = 47
 # 4 = 3023
 # 5 = 110439
-  @deck_size 2
-  @deck for x <- 0..3, y <- 2..3, do: {x, y}
+  @deck_size 4
+  @deck for x <- 0..3, y <- 2..5, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -225,10 +225,10 @@ defmodule Bridge do # {
   def gathering(plays\\[]) do
     receive do
       {:add, aPlay} ->
-        IO.puts "gathering.add"
+        #IO.puts "gathering.add"
         gathering([aPlay|plays])
       {:give, sender} ->
-        IO.puts "gathering.give"
+        #IO.puts "gathering.give"
         send sender, {:ok, plays}
     end
   end
