@@ -4,6 +4,7 @@ defmodule Bridge do # {
   """
 
   import Enum, only: [ reverse: 1 ]
+  import :timer, only: [sleep: 1]
 
   def seats, do: { :North, :East, :South, :West }
   def suits, do: { :Clubs, :Diamonds, :Hearts, :Spades, :NoTrumps }
@@ -36,8 +37,8 @@ defmodule Bridge do # {
 # 3 = 47
 # 4 = 3023
 # 5 = 110439
-  @deck_size 2
-  @deck for x <- 0..3, y <- 2..3, do: {x, y}
+  @deck_size 3
+  @deck for x <- 0..3, y <- 2..4, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -222,14 +223,36 @@ defmodule Bridge do # {
     end
   )
 
-  def gathering(plays\\[]) do
+  def spawner(gather, function, args) do
+    #IO.puts "spawner"
+    send gather, {:start}
+    spawn_monitor(Bridge, function, args)
     receive do
+      _msg ->
+        #IO.puts "spawner got #{inspect msg}"
+        send gather, {:end}
+    end
+  end
+  def gathering(agents\\0, plays\\[]) do
+    receive do
+      {:start} ->
+        #IO.puts "start #{agents}"
+        gathering(agents + 1, plays)
+      {:end} ->
+        #IO.puts "end #{agents}"
+        gathering(agents - 1, plays)
       {:add, aPlay} ->
-        IO.puts "gathering.add"
-        gathering([aPlay|plays])
+        #IO.puts "gathering.add"
+        gathering(agents, [aPlay|plays])
       {:give, sender} ->
-        IO.puts "gathering.give"
-        send sender, {:ok, plays}
+        case agents do
+          0 ->
+            send sender, {:ok, plays}
+          _ ->
+            IO.puts "gathering.give #{agents}"
+            sleep 500
+            send self(), {:give, sender}
+        end
     end
   end
 
@@ -287,7 +310,8 @@ defmodule Bridge do # {
   def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
     {lead_suit, _} = card
     new_h1 = remove_card(h1, card)
-    play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
+    #play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
+    spawner(gather, :play, [gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played]])
 
     play(gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
   end # }
