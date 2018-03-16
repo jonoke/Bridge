@@ -273,14 +273,16 @@ defmodule Bridge do # {
   def play(_gather, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
 
   #
-  # When playable is nil (lead_suit will be NT), it means "LEAD A CARD" - get list of cards to play by calling playable(lead_suit, h1).
+  # When playable is nil it means get list of playable cards appropriate to the card lead (any card if lead is nt)
   #
   def play(gather, h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
     play(gather, h1, h2, h3, h4, trumps, leader, playable(lead_suit, h1), round, lead_suit, position, hand, played)
   end # }
 
+  #
+  # Lead a card
+  #
   def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
-
     {lead_suit, _} = card
     new_h1 = remove_card(h1, card)
     play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
