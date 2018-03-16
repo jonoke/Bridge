@@ -225,8 +225,10 @@ defmodule Bridge do # {
   def gathering(plays\\[]) do
     receive do
       {:add, aPlay} ->
+        IO.puts "gathering.add"
         gathering([aPlay|plays])
       {:give, sender} ->
+        IO.puts "gathering.give"
         send sender, {:ok, plays}
     end
   end
@@ -234,14 +236,14 @@ defmodule Bridge do # {
   #
   # rotate h1 - h4 relative to winner
   # 
-  def play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, playable, round, lead_suit, position, hand, played) when winner == leader do
-    play(gather, h1, h2, h3, h4, trumps, winner, playable, round, lead_suit, position, hand, played)
+  def play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, round, hand) when winner == leader do
+    play(gather, h1, h2, h3, h4, trumps, winner, nil, round, @nt, 0, hand, [])
   end
-  def play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, playable, round, lead_suit, position, hand, played) when winner > leader do
-    play_winner(gather, h2, h3, h4, h1, trumps, leader + 1, winner, playable, round, lead_suit, position, hand, played)
+  def play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, round, hand) when winner > leader do
+    play_winner(gather, h2, h3, h4, h1, trumps, leader + 1, winner, round, hand)
   end
-  def play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, playable, round, lead_suit, position, hand, played) when leader > winner do
-    play_winner(gather, h4, h1, h2, h3, trumps, leader - 1, winner, playable, round, lead_suit, position, hand, played)
+  def play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, round, hand) when leader > winner do
+    play_winner(gather, h4, h1, h2, h3, trumps, leader - 1, winner, round, hand)
   end
 
   #
@@ -264,7 +266,7 @@ defmodule Bridge do # {
     played = reverse(played)
     {_card, winner} = wins(trumps, played)
     winner = rem(leader + winner, 4)
-    play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, nil, round + 1, @nt, 0, [{winner, played} | hand], [])
+    play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, round + 1, [{winner, played} | hand])
   end # }
 
   #
@@ -273,7 +275,7 @@ defmodule Bridge do # {
   def play(_gather, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
 
   #
-  # When playable is nil it means get list of playable cards appropriate to the card lead (any card if lead is nt)
+  # When playable is nil it means get list of playable cards appropriate to the card lead (= @nt if this is the lead)
   #
   def play(gather, h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
     play(gather, h1, h2, h3, h4, trumps, leader, playable(lead_suit, h1), round, lead_suit, position, hand, played)
@@ -296,7 +298,7 @@ defmodule Bridge do # {
   def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, lead_suit, position, hand, played) do # {
     new_h1 = remove_card(h1, card)
     play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
-      play(gather, h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
+    play(gather, h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
   end # }
 
   def player([{nh, _}, {eh, _}, {sh, _}, {wh, _}], trumps, declarer) do # {
