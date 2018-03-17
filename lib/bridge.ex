@@ -36,8 +36,8 @@ defmodule Bridge do # {
 # 3 = 47
 # 4 = 3023
 # 5 = 110439
-  @deck_size 4
-  @deck for x <- 0..3, y <- 2..5, do: {x, y}
+  @deck_size 5
+  @deck for x <- 0..3, y <- 2..6, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -343,6 +343,7 @@ defmodule Bridge do # {
     :rand.seed(:exrop, {1, 2, 3})
     hand =  deal()
     show(hand)
-    :timer.tc(fn -> player(hand, spades(), north()) end)
+    {times, lists} = :timer.tc(fn -> player(hand, spades(), north()) end)
+    IO.puts "that took #{times} with #{length(lists)} ways"
   end
 end # }
