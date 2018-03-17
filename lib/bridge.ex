@@ -233,6 +233,29 @@ defmodule Bridge do # {
         send gather, {:end}
     end
   end
+  def getResults(gather) do
+    #IO.puts "getResults"
+    #sleep 200
+    send gather, {:agents, self()}
+    receive do
+      {:agents, running} ->
+        #IO.puts "getResults got :agents #{running}"
+        cond do
+          running = 0 ->
+            #IO.puts "   got running = 0"
+            send gather, {:give, self()}
+            getResults(gather)
+          true ->
+            #IO.puts "getResults #{running} running"
+            sleep 500
+            send gather, {:agents, self()}
+            getResults(gather)
+        end
+      {:give, results} ->
+        #IO.puts "getResults got :give"
+        results
+    end
+  end
   def gathering(agents\\0, plays\\[]) do
     receive do
       {:start} ->
@@ -241,18 +264,17 @@ defmodule Bridge do # {
       {:end} ->
         #IO.puts "end #{agents}"
         gathering(agents - 1, plays)
+      {:agents, sender} ->
+        #IO.puts "gathering got :agents"
+        send sender, {:agents, agents}
+        gathering(agents, plays)
       {:add, aPlay} ->
         #IO.puts "gathering.add"
         gathering(agents, [aPlay|plays])
       {:give, sender} ->
-        case agents do
-          0 ->
-            send sender, {:ok, plays}
-          _ ->
-            IO.puts "gathering.give #{agents}"
-            sleep 500
-            send self(), {:give, sender}
-        end
+        #IO.puts "gathering got give"
+        send sender, {:give, plays}
+        gathering(agents, plays)
     end
   end
 
@@ -336,10 +358,7 @@ defmodule Bridge do # {
       @south -> play(gather, wh, nh, eh, sh, trumps, @west)
       @west  -> play(gather, nh, eh, sh, wh, trumps, @north)
     end
-    send gather, {:give, self()}
-    receive do
-      {:ok, hands} -> hands
-    end
+    getResults(gather)
   end # }
 
   def showPlay([]), do: IO.write ") "
