@@ -163,15 +163,15 @@ defmodule Bridge do # {
   def unbal_plus_unbal?([n,e,s,w]) do
     Shapes.unbal?(n) and (Shapes.unbal?(s) or Shapes.unbal?(e) or Shapes.unbal?(w))
   end
-#  def counter(n, check, count \\ 0)
-#  def counter(0, _, count), do: count
-#  def counter(n, check, count) do
+#  def Counter(n, check, count \\ 0)
+#  def Counter(0, _, count), do: count
+#  def Counter(n, check, count) do
 #    aDeal = deal()
 #    match = case check.(aDeal) do
 #      true -> 1
 #      false -> 0
 #    end
-#    counter(n - 1, check, count + match)
+#    Counter(n - 1, check, count + match)
 #  end
 
   def count(n, count \\ 0)
@@ -218,28 +218,15 @@ defmodule Bridge do # {
     end
   )
 
-  def spawnee(counter, function, args) do
-    #IO.puts "spawnee"
-    send counter, {:start}
-    spawn_monitor(Bridge, function, args)
-    receive do
-      _msg ->
-        #IO.puts "spawner got #{inspect msg}"
-        send counter, {:end}
-    end
-  end
-  def spawner(counter, function, args) do
-    #IO.puts "spawner"
-    spawn(Bridge, :spawnee, [counter, function, args])
-  end
   def counting(agents\\0) do
     receive do
-      {:start} ->
-        #IO.puts "start #{agents}"
-        counting(agents + 1)
-      {:end} ->
+      {:DOWN, _, _, _, _} ->
         #IO.puts "end #{agents}"
         counting(agents - 1)
+      {:start, function, args} ->
+        #IO.puts "start #{agents}"
+        spawn_monitor(Bridge, function, args)
+        counting(agents + 1)
       {:agents, sender} ->
         #IO.puts "agents got :agents"
         send sender, {:agents, agents}
@@ -266,10 +253,10 @@ defmodule Bridge do # {
   def gathering(plays\\[]) do
     receive do
       {:add, aPlay} ->
-        #IO.puts "gathering.add"
+        #IO.puts "gathering.add #{inspect aPlay}"
         gathering([aPlay|plays])
       {:give, sender} ->
-        #IO.puts "gathering got give"
+        IO.puts "gathering got give"
         send sender, {:give, plays}
         gathering(plays)
     end
@@ -320,6 +307,7 @@ defmodule Bridge do # {
   # When playable is nil it means get list of playable cards appropriate to the card lead (= @nt if this is the lead)
   #
   def play(counter, gather, h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
+    #IO.puts "play A #{round} #{position}"
     play(counter, gather, h1, h2, h3, h4, trumps, leader, playable(lead_suit, h1), round, lead_suit, position, hand, played)
   end # }
 
@@ -328,12 +316,13 @@ defmodule Bridge do # {
   #
   def play(counter, gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
     {lead_suit, _} = card
+    #IO.puts "play B #{cardStr(card)}"
     new_h1 = remove_card(h1, card)
     #play(counter, gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
-    spawner(counter, :play, [counter, gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played]])
+    send counter, {:start, :play, [counter, gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played]]}
 
     #play(counter, gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position, hand, played)
-    spawner(counter, :play, [counter, gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position, hand, played])
+    send counter, {:start, :play, [counter, gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position, hand, played]}
   end # }
 
   #
