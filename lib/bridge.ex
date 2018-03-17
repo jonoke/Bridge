@@ -37,8 +37,8 @@ defmodule Bridge do # {
 # 3 = 47
 # 4 = 3023
 # 5 = 110439
-  @deck_size 5
-  @deck for x <- 0..3, y <- 2..6, do: {x, y}
+  @deck_size 3
+  @deck for x <- 0..3, y <- 2..4, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -50,11 +50,6 @@ defmodule Bridge do # {
   def slot(card, []), do: [card]
   def slot(card, [hd|tl]) when card > hd, do: [card|[hd|tl]]
   def slot(card, [hd|tl]), do: [hd|slot(card,tl)]
-
-#  def split(card = {0,_}, {cl,di,he,sp}), do: {slot(card, cl),di,he,sp}
-#  def split(card = {1,_}, {cl,di,he,sp}), do: {cl,slot(card, di),he,sp}
-#  def split(card = {2,_}, {cl,di,he,sp}), do: {cl,di,slot(card, he),sp}
-#  def split(card = {3,_}, {cl,di,he,sp}), do: {cl,di,he,slot(card, sp)}
 
   def dealer(shuffled, idx \\ 0, aDeal \\ [], aHand \\ {[], [], [], []}, hcp \\0, lc\\0, ld\\0, lh\\0, ls\\0)
 
@@ -168,16 +163,16 @@ defmodule Bridge do # {
   def unbal_plus_unbal?([n,e,s,w]) do
     Shapes.unbal?(n) and (Shapes.unbal?(s) or Shapes.unbal?(e) or Shapes.unbal?(w))
   end
-  def counter(n, check, count \\ 0)
-  def counter(0, _, count), do: count
-  def counter(n, check, count) do
-    aDeal = deal()
-    match = case check.(aDeal) do
-      true -> 1
-      false -> 0
-    end
-    counter(n - 1, check, count + match)
-  end
+#  def counter(n, check, count \\ 0)
+#  def counter(0, _, count), do: count
+#  def counter(n, check, count) do
+#    aDeal = deal()
+#    match = case check.(aDeal) do
+#      true -> 1
+#      false -> 0
+#    end
+#    counter(n - 1, check, count + match)
+#  end
 
   def count(n, count \\ 0)
   def count(0, count), do: count
@@ -223,58 +218,60 @@ defmodule Bridge do # {
     end
   )
 
-  def spawner(gather, function, args) do
-    #IO.puts "spawner"
-    send gather, {:start}
+  def spawnee(counter, function, args) do
+    IO.puts "spawnee"
+    send counter, {:start}
     spawn_monitor(Bridge, function, args)
     receive do
       _msg ->
         #IO.puts "spawner got #{inspect msg}"
-        send gather, {:end}
+        send counter, {:end}
     end
   end
-  def getResults(gather) do
+  def spawner(counter, function, args) do
+    #IO.puts "spawner"
+    spawn(Bridge, :spawnee, [counter, function, args])
+  end
+  def counting(agents\\0) do
+    receive do
+      {:start} ->
+        #IO.puts "start #{agents}"
+        counting(agents + 1)
+      {:end} ->
+        #IO.puts "end #{agents}"
+        counting(agents - 1)
+      {:agents, sender} ->
+        #IO.puts "agents got :agents"
+        send sender, {:agents, agents}
+        counting(agents)
+    end
+  end
+  def getResults(counter, gather, sender) do
     #IO.puts "getResults"
-    #sleep 200
-    send gather, {:agents, self()}
+    send counter, {:agents, self()}
     receive do
       {:agents, running} ->
         #IO.puts "getResults got :agents #{running}"
         cond do
-          running = 0 ->
+          running == 0 ->
             #IO.puts "   got running = 0"
-            send gather, {:give, self()}
-            getResults(gather)
+            send gather, {:give, sender}
           true ->
             #IO.puts "getResults #{running} running"
             sleep 500
-            send gather, {:agents, self()}
-            getResults(gather)
+            getResults(counter, gather, sender)
         end
-      {:give, results} ->
-        #IO.puts "getResults got :give"
-        results
     end
   end
-  def gathering(agents\\0, plays\\[]) do
+  def gathering(plays\\[]) do
     receive do
-      {:start} ->
-        #IO.puts "start #{agents}"
-        gathering(agents + 1, plays)
-      {:end} ->
-        #IO.puts "end #{agents}"
-        gathering(agents - 1, plays)
-      {:agents, sender} ->
-        #IO.puts "gathering got :agents"
-        send sender, {:agents, agents}
-        gathering(agents, plays)
       {:add, aPlay} ->
         #IO.puts "gathering.add"
-        gathering(agents, [aPlay|plays])
+        gathering([aPlay|plays])
       {:give, sender} ->
         #IO.puts "gathering got give"
         send sender, {:give, plays}
-        gathering(agents, plays)
+        gathering(plays)
     end
   end
 
@@ -291,10 +288,21 @@ defmodule Bridge do # {
     play_winner(gather, h4, h1, h2, h3, trumps, leader - 1, winner, round, hand)
   end
 
+  def play1(counter, gather, h1, h2, h3, h4, trumps, leader) do
+    play2(counter, gather, h1, h2, h3, h4, trumps, leader, playable(@nt, h1), 0, @nt, 0, [], [])
+  end
+  def play2(_counter, _gather, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
+  def play2(counter, gather, h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
+    new_h1 = remove_card(h1, card)
+    spawner(counter, :play, [gather, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]])
+
+    play2(counter, gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
+  end # }
+
+
   #
   # template
   #
-
   def play(gather, h1, h2, h3, h4, trumps, leader, playable\\nil, round\\0, lead_suit\\@nt, position\\0, hand\\[], played\\[])
 
   #
@@ -332,8 +340,7 @@ defmodule Bridge do # {
   def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
     {lead_suit, _} = card
     new_h1 = remove_card(h1, card)
-    #play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
-    spawner(gather, :play, [gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played]])
+    play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
 
     play(gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
   end # }
@@ -351,14 +358,19 @@ defmodule Bridge do # {
     #
     # create a process to receive hand plays
     #
+    counter = spawn(Bridge, :counting, [])
     gather = spawn(Bridge, :gathering, [])
     case declarer do
-      @north -> play(gather, eh, sh, wh, nh, trumps, @east)
-      @east  -> play(gather, sh, wh, nh, eh, trumps, @south)
-      @south -> play(gather, wh, nh, eh, sh, trumps, @west)
-      @west  -> play(gather, nh, eh, sh, wh, trumps, @north)
+      @north -> play1(counter, gather, eh, sh, wh, nh, trumps, @east)
+      @east  -> play1(counter, gather, sh, wh, nh, eh, trumps, @south)
+      @south -> play1(counter, gather, wh, nh, eh, sh, trumps, @west)
+      @west  -> play1(counter, gather, nh, eh, sh, wh, trumps, @north)
     end
-    getResults(gather)
+    sleep 1000
+    getResults(counter, gather, self())
+    receive do
+      {:give, results} -> results
+    end
   end # }
 
   def showPlay([]), do: IO.write ") "
@@ -386,7 +398,8 @@ defmodule Bridge do # {
     :rand.seed(:exrop, {1, 2, 3})
     hand =  deal()
     show(hand)
-    {times, lists} = :timer.tc(fn -> player(hand, spades(), north()) end)
-    IO.puts "that took #{times} with #{length(lists)} ways"
+    {times, hands} = :timer.tc(fn -> player(hand, spades(), north()) end)
+    IO.puts "that took #{times} with #{length(hands)} ways"
+    showHands(@east, hands)
   end
 end # }
