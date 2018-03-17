@@ -37,8 +37,8 @@ defmodule Bridge do # {
 # 3 = 47
 # 4 = 3023
 # 5 = 110439
-  @deck_size 3
-  @deck for x <- 0..3, y <- 2..4, do: {x, y}
+  @deck_size 5
+  @deck for x <- 0..3, y <- 2..6, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -219,7 +219,7 @@ defmodule Bridge do # {
   )
 
   def spawnee(counter, function, args) do
-    IO.puts "spawnee"
+    #IO.puts "spawnee"
     send counter, {:start}
     spawn_monitor(Bridge, function, args)
     receive do
@@ -278,80 +278,71 @@ defmodule Bridge do # {
   #
   # rotate h1 - h4 relative to winner
   # 
-  def play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, round, hand) when winner == leader do
-    play(gather, h1, h2, h3, h4, trumps, winner, nil, round, @nt, 0, hand, [])
+  def play_winner(counter, gather, h1, h2, h3, h4, trumps, leader, winner, round, hand) when winner == leader do
+    play(counter, gather, h1, h2, h3, h4, trumps, winner, nil, round, @nt, 0, hand, [])
   end
-  def play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, round, hand) when winner > leader do
-    play_winner(gather, h2, h3, h4, h1, trumps, leader + 1, winner, round, hand)
+  def play_winner(counter, gather, h1, h2, h3, h4, trumps, leader, winner, round, hand) when winner > leader do
+    play_winner(counter, gather, h2, h3, h4, h1, trumps, leader + 1, winner, round, hand)
   end
-  def play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, round, hand) when leader > winner do
-    play_winner(gather, h4, h1, h2, h3, trumps, leader - 1, winner, round, hand)
+  def play_winner(counter, gather, h1, h2, h3, h4, trumps, leader, winner, round, hand) when leader > winner do
+    play_winner(counter, gather, h4, h1, h2, h3, trumps, leader - 1, winner, round, hand)
   end
-
-  def play1(counter, gather, h1, h2, h3, h4, trumps, leader) do
-    play2(counter, gather, h1, h2, h3, h4, trumps, leader, playable(@nt, h1), 0, @nt, 0, [], [])
-  end
-  def play2(_counter, _gather, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
-  def play2(counter, gather, h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
-    new_h1 = remove_card(h1, card)
-    spawner(counter, :play, [gather, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]])
-
-    play2(counter, gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
-  end # }
 
 
   #
   # template
   #
-  def play(gather, h1, h2, h3, h4, trumps, leader, playable\\nil, round\\0, lead_suit\\@nt, position\\0, hand\\[], played\\[])
+  def play(counter, gather, h1, h2, h3, h4, trumps, leader, playable\\nil, round\\0, lead_suit\\@nt, position\\0, hand\\[], played\\[])
 
   #
   # end of play ... return reversed play
   # 
-  def play(gather, _h1, _h2, _h3, _h4, _trumps, _leader, _playable, @deck_size, _lead_suit, _position, hand, _played) do
+  def play(_counter, gather, _h1, _h2, _h3, _h4, _trumps, _leader, _playable, @deck_size, _lead_suit, _position, hand, _played) do
     send gather, {:add, reverse(hand)}
   end
 
   #
   # end of one round
   #
-  def play(gather, h1, h2, h3, h4, trumps, leader, _playable, round, _lead_suit, 4, hand, played) do # {
+  def play(counter, gather, h1, h2, h3, h4, trumps, leader, _playable, round, _lead_suit, 4, hand, played) do # {
     played = reverse(played)
     {_card, winner} = wins(trumps, played)
     winner = rem(leader + winner, 4)
-    play_winner(gather, h1, h2, h3, h4, trumps, leader, winner, round + 1, [{winner, played} | hand])
+    play_winner(counter, gather, h1, h2, h3, h4, trumps, leader, winner, round + 1, [{winner, played} | hand])
   end # }
 
   #
   # what is this ... ??
   #
-  def play(_gather, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
+  def play(_counter, _gather, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
 
   #
   # When playable is nil it means get list of playable cards appropriate to the card lead (= @nt if this is the lead)
   #
-  def play(gather, h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
-    play(gather, h1, h2, h3, h4, trumps, leader, playable(lead_suit, h1), round, lead_suit, position, hand, played)
+  def play(counter, gather, h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
+    play(counter, gather, h1, h2, h3, h4, trumps, leader, playable(lead_suit, h1), round, lead_suit, position, hand, played)
   end # }
 
   #
   # Lead a card
   #
-  def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
+  def play(counter, gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
     {lead_suit, _} = card
     new_h1 = remove_card(h1, card)
-    play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
+    #play(counter, gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
+    spawner(counter, :play, [counter, gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played]])
 
-    play(gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
+    #play(counter, gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position, hand, played)
+    spawner(counter, :play, [counter, gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position, hand, played])
   end # }
 
   #
   # Play a card to a lead
   #
-  def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, lead_suit, position, hand, played) do # {
+  def play(counter, gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, lead_suit, position, hand, played) do # {
     new_h1 = remove_card(h1, card)
-    play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
-    play(gather, h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
+    play(counter, gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
+    play(counter, gather, h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
   end # }
 
   def player([{nh, _}, {eh, _}, {sh, _}, {wh, _}], trumps, declarer) do # {
@@ -361,12 +352,12 @@ defmodule Bridge do # {
     counter = spawn(Bridge, :counting, [])
     gather = spawn(Bridge, :gathering, [])
     case declarer do
-      @north -> play1(counter, gather, eh, sh, wh, nh, trumps, @east)
-      @east  -> play1(counter, gather, sh, wh, nh, eh, trumps, @south)
-      @south -> play1(counter, gather, wh, nh, eh, sh, trumps, @west)
-      @west  -> play1(counter, gather, nh, eh, sh, wh, trumps, @north)
+      @north -> play(counter, gather, eh, sh, wh, nh, trumps, @east)
+      @east  -> play(counter, gather, sh, wh, nh, eh, trumps, @south)
+      @south -> play(counter, gather, wh, nh, eh, sh, trumps, @west)
+      @west  -> play(counter, gather, nh, eh, sh, wh, trumps, @north)
     end
-    sleep 1000
+    sleep 100
     getResults(counter, gather, self())
     receive do
       {:give, results} -> results
@@ -400,6 +391,6 @@ defmodule Bridge do # {
     show(hand)
     {times, hands} = :timer.tc(fn -> player(hand, spades(), north()) end)
     IO.puts "that took #{times} with #{length(hands)} ways"
-    showHands(@east, hands)
+    #showHands(@east, hands)
   end
 end # }
