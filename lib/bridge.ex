@@ -224,7 +224,7 @@ defmodule Bridge do # {
     spawn_monitor(Bridge, function, args)
     receive do
       _msg ->
-        #IO.puts "spawner got #{inspect msg}"
+        #IO.puts "spawnee got #{inspect msg}"
         send counter, {:end}
     end
   end
@@ -232,10 +232,17 @@ defmodule Bridge do # {
     #IO.puts "spawner"
     spawn(Bridge, :spawnee, [counter, function, args])
   end
+
   def counting(agents\\0) do
     receive do
+      {:DOWN, _, _, _, _, _} ->
+        IO.puts "DOWN"
+        counting(agents - 1)
+      {:starter, function, args} ->
+        IO.puts "start #{agents}"
+        spawn_link(Bridge, function, args)
+        counting(agents + 1)
       {:start} ->
-        #IO.puts "start #{agents}"
         counting(agents + 1)
       {:end} ->
         #IO.puts "end #{agents}"
@@ -294,7 +301,8 @@ defmodule Bridge do # {
   def play2(_counter, _gather, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
   def play2(counter, gather, h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
     new_h1 = remove_card(h1, card)
-    spawner(counter, :play, [gather, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]])
+     #spawner(counter, :play, [gather, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]])
+     send counter, {:starter, :play, [gather, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
 
     play2(counter, gather, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
   end # }
@@ -331,6 +339,7 @@ defmodule Bridge do # {
   # When playable is nil it means get list of playable cards appropriate to the card lead (= @nt if this is the lead)
   #
   def play(gather, h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
+    #IO.puts "play A #{round} #{position}"
     play(gather, h1, h2, h3, h4, trumps, leader, playable(lead_suit, h1), round, lead_suit, position, hand, played)
   end # }
 
@@ -339,6 +348,7 @@ defmodule Bridge do # {
   #
   def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
     {lead_suit, _} = card
+    #IO.puts "play B #{round} #{position} #{cardStr(card)}"
     new_h1 = remove_card(h1, card)
     play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
 
@@ -349,6 +359,7 @@ defmodule Bridge do # {
   # Play a card to a lead
   #
   def play(gather, h1, h2, h3, h4, trumps, leader, [card|rest], round, lead_suit, position, hand, played) do # {
+    #IO.puts "play C #{round} #{position} #{cardStr(card)}"
     new_h1 = remove_card(h1, card)
     play(gather, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
     play(gather, h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
@@ -366,7 +377,7 @@ defmodule Bridge do # {
       @south -> play1(counter, gather, wh, nh, eh, sh, trumps, @west)
       @west  -> play1(counter, gather, nh, eh, sh, wh, trumps, @north)
     end
-    sleep 1000
+    sleep 100
     getResults(counter, gather, self())
     receive do
       {:give, results} -> results
@@ -400,6 +411,6 @@ defmodule Bridge do # {
     show(hand)
     {times, hands} = :timer.tc(fn -> player(hand, spades(), north()) end)
     IO.puts "that took #{times} with #{length(hands)} ways"
-    showHands(@east, hands)
+    #showHands(@east, hands)
   end
 end # }
