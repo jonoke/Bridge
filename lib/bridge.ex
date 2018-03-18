@@ -37,8 +37,8 @@ defmodule Bridge do # {
 # 3 = 47
 # 4 = 3023
 # 5 = 110439
-  @deck_size 6
-  @deck for x <- 0..3, y <- 2..7, do: {x, y}
+  @deck_size 5
+  @deck for x <- 0..3, y <- 2..6, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -218,23 +218,38 @@ defmodule Bridge do # {
     larger
   end
 
-  def playable(_trumps, @nt, {cl,di,he,sp}, _played), do: cl ++ di ++ he ++ sp
+  def smallest([]), do: []
+  def smallest(list), do: Enum.at(Enum.reverse(list), 0)
 
-  def playable(_trumps, @cl, {[],di,he,sp}, _played), do: smallest_of_each(
-  def playable(@cl,    @cl, {cl,_d,_h,_s}, played), do: all_larger_and_smallest(@cl, played, cl)
-  def playable(_trumps, @cl, {cl,_d,_h,_s}, _played), do: cl
+  def smallest_of_each(a, b, c), do: List.flatten([smallest(a), smallest(b), smallest(c)])
 
-  def playable(_trumps, @di, {cl,[],he,sp}, _played), do: cl ++ he ++ sp
-  def playable(@di,    @di, {_c,di,_h,_s}, played), do: all_larger_and_smallest(@di, played, di)
-  def playable(_trumps, @di, {_c,di,_h,_s}, _played), do: di
+  def all_and_smallest_of_each(all, a, b), do: List.flatten([all, smallest(a), smallest(b)])
 
-  def playable(_trumps, @he, {cl,di,[],sp}, _played), do: cl ++ di ++ sp
-  def playable(@he,    @he, {_c,_d,he,_s}, played), do: all_larger_and_smallest(@he, played, he)
-  def playable(_trumps, @he, {_c,_d,he,_s}, _played), do: he
+  def playable(_trumps,@nt, {cl,di,he,sp}, _played), do: cl ++ di ++ he ++ sp
 
-  def playable(_trumps, @sp, {cl,di,he,[]}, _played), do: cl ++ di ++ he
-  def playable(@sp,    @sp, {_c,_d,_h,sp}, played), do: all_larger_and_smallest(@sp, played, sp)
-  def playable(_trumps, @sp, {_c,_d,_h,sp}, _played), do: sp
+  def playable(@cl,    @cl, {[],di,he,sp}, _played), do:         smallest_of_each(di,he,sp)
+  def playable(@di,    @cl, {[],di,he,sp}, _played), do: all_and_smallest_of_each(di,he,sp)
+  def playable(@he,    @cl, {[],di,he,sp}, _played), do: all_and_smallest_of_each(he,di,sp)
+  def playable(@sp,    @cl, {[],di,he,sp}, _played), do: all_and_smallest_of_each(sp,di,he)
+  def playable(_trumps,@cl, {cl,_d,_h,_s},  played), do: all_larger_and_smallest(@cl, played, cl)
+
+  def playable(@cl,    @di, {cl,[],he,sp}, _played), do: all_and_smallest_of_each(cl,he,sp)
+  def playable(@di,    @di, {cl,[],he,sp}, _played), do:         smallest_of_each(cl,he,sp)
+  def playable(@he,    @di, {cl,[],he,sp}, _played), do: all_and_smallest_of_each(he,cl,sp)
+  def playable(@sp,    @di, {cl,[],he,sp}, _played), do: all_and_smallest_of_each(sp,cl,he)
+  def playable(_trumps,@di, {_c,di,_h,_s},  played), do: all_larger_and_smallest(@di, played, di)
+
+  def playable(@cl,    @he, {cl,di,[],sp}, _played), do: all_and_smallest_of_each(cl,di,sp)
+  def playable(@di,    @he, {cl,di,[],sp}, _played), do: all_and_smallest_of_each(di,cl,sp)
+  def playable(@he,    @he, {cl,di,[],sp}, _played), do:         smallest_of_each(cl,di,sp)
+  def playable(@sp,    @he, {cl,di,[],sp}, _played), do: all_and_smallest_of_each(sp,cl,di)
+  def playable(_trumps,@he, {_c,_d,he,_s},  played), do: all_larger_and_smallest(@he, played, he)
+
+  def playable(@cl,    @sp, {cl,di,he,[]}, _played), do: all_and_smallest_of_each(cl,di,he)
+  def playable(@di,    @sp, {cl,di,he,[]}, _played), do: all_and_smallest_of_each(di,cl,he)
+  def playable(@he,    @sp, {cl,di,he,[]}, _played), do: all_and_smallest_of_each(he,cl,di)
+  def playable(@sp,    @sp, {cl,di,he,[]}, _played), do:         smallest_of_each(cl,di,he)
+  def playable(_trumps,@sp, {_c,_d,_h,sp},  played), do: all_larger_and_smallest(@sp, played, sp)
 
   def remove_card({cl,di,he,sp}, card = {@cl, _}), do: {List.delete(cl,card),di,he,sp}
   def remove_card({cl,di,he,sp}, card = {@di, _}), do: {cl,List.delete(di,card),he,sp}
