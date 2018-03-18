@@ -37,8 +37,8 @@ defmodule Bridge do # {
 # 3 = 47
 # 4 = 3023
 # 5 = 110439
-  @deck_size 3
-  @deck for x <- 0..3, y <- 2..4, do: {x, y}
+  @deck_size 5
+  @deck for x <- 0..3, y <- 2..6, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -235,12 +235,12 @@ defmodule Bridge do # {
 
   def counting(agents\\0) do
     receive do
-      {:DOWN, _, _, _, _, _} ->
-        IO.puts "DOWN"
+      {:DOWN, _, _, _, _} ->
+        #IO.puts "end #{agents}"
         counting(agents - 1)
       {:starter, function, args} ->
-        IO.puts "start #{agents}"
-        spawn_link(Bridge, function, args)
+        #IO.puts "start #{agents}"
+        spawn_monitor(Bridge, function, args)
         counting(agents + 1)
       {:start} ->
         counting(agents + 1)
