@@ -37,8 +37,8 @@ defmodule Bridge do # {
 # 3 = 47
 # 4 = 3023
 # 5 = 110439
-  @deck_size 5
-  @deck for x <- 0..3, y <- 2..6, do: {x, y}
+  @deck_size 3
+  @deck for x <- 0..3, y <- 2..4, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -291,26 +291,35 @@ defmodule Bridge do # {
         end
     end
   end
-  def controlling(agents, plays) do
+  def add_to_plays(aPlay, plays) do
+  end
+  def controlling(declarer, agents, num_plays, plays) do
     receive do
       {:add, aPlay} ->
         #IO.puts "controlling.add"
-        controlling(agents, [aPlay|plays])
+        #case rem(num_plays, 100000) do
+        #  0 -> IO.write "#{num_plays}\r"
+        #  _ -> nil
+        #end
+        controlling(declarer, agents, num_plays + 1, [aPlay|plays])
       {:give, sender} ->
         #IO.puts "controlling got give"
-        send sender, {:give, plays}
-        controlling(agents, plays)
+        send sender, {:give, num_plays, plays}
+        controlling(declarer, agents, num_plays, plays)
       {:DOWN, _, _, _, _} ->
-        #IO.puts "end #{agents}"
-        controlling(agents - 1, plays)
+        IO.puts "end #{agents}"
+        case agents do
+          1 -> plays
+          _ -> controlling(declarer, agents - 1, num_plays, plays)
+        end
       {:starter, function, args} ->
-        #IO.puts "start #{agents}"
+        IO.puts "start #{agents}"
         spawn_monitor(Bridge, function, args)
-        controlling(agents + 1, plays)
+        controlling(declarer, agents + 1, num_plays, plays)
       {:agents, sender} ->
         #IO.puts "agents got :agents"
         send sender, {:agents, agents}
-        controlling(agents, plays)
+        controlling(declarer, agents, num_plays, plays)
     end
   end
 
@@ -333,8 +342,8 @@ defmodule Bridge do # {
   def play2(_control, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
   def play2(control, h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
     new_h1 = remove_card(h1, card)
-    #send control, {:starter, :play, [control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
-    play(control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played])
+    send control, {:starter, :play, [control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
+    #play(control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played])
 
     play2(control, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
   end # }
@@ -396,22 +405,18 @@ defmodule Bridge do # {
     play(control, h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
   end # }
 
-  def player([{nh, _}, {eh, _}, {sh, _}, {wh, _}], trumps, declarer) do # {
+  def player([{nh, _}, {eh, _}, {sh, _}, {wh, _}], declarer, trumps) do # {
     #
     # create a process to receive hand plays
     #
-    control = spawn(Bridge, :controlling, [0, []])
+
     case declarer do
-      @north -> play1(control, eh, sh, wh, nh, trumps, @east)
-      @east  -> play1(control, sh, wh, nh, eh, trumps, @south)
-      @south -> play1(control, wh, nh, eh, sh, trumps, @west)
-      @west  -> play1(control, nh, eh, sh, wh, trumps, @north)
+      @north -> play1(self(), eh, sh, wh, nh, trumps, @east)
+      @east  -> play1(self(), sh, wh, nh, eh, trumps, @south)
+      @south -> play1(self(), wh, nh, eh, sh, trumps, @west)
+      @west  -> play1(self(), nh, eh, sh, wh, trumps, @north)
     end
-    sleep 100
-    getResults(control, self())
-    receive do
-      {:give, results} -> results
-    end
+    controlling(declarer, 0, 0, [])
   end # }
 
   def showPlay([]), do: IO.write ") "
@@ -439,8 +444,8 @@ defmodule Bridge do # {
     :rand.seed(:exrop, {1, 2, 3})
     hand =  deal()
     show(hand)
-    {times, hands} = :timer.tc(fn -> player(hand, spades(), north()) end)
+    {times, hands} = :timer.tc(fn -> player(hand, north(), spades()) end)
     IO.puts "that took #{times} with #{length(hands)} ways"
-    #showHands(@east, hands)
+    showHands(@east, hands)
   end
 end # }
