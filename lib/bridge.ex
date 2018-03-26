@@ -291,8 +291,12 @@ defmodule Bridge do # {
         end
     end
   end
-  def add_to_plays(aPlay, plays) do
-  end
+  def score_hand([], n_s), do: n_s
+  def score_hand([{@north, _play}|rest], n_s), do: score_hand(rest, n_s + 1)
+  def score_hand([{@south, _play}|rest], n_s), do: score_hand(rest, n_s + 1)
+  def score_hand([{_,      _play}|rest], n_s), do: score_hand(rest, n_s)
+  def add_to_plays(aPlay, plays), do: [{score_hand(aPlay, 0), aPlay}|plays]
+
   def controlling(declarer, agents, num_plays, plays) do
     receive do
       {:add, aPlay} ->
@@ -301,7 +305,8 @@ defmodule Bridge do # {
         #  0 -> IO.write "#{num_plays}\r"
         #  _ -> nil
         #end
-        controlling(declarer, agents, num_plays + 1, [aPlay|plays])
+        #controlling(declarer, agents, num_plays + 1, [aPlay|plays])
+        controlling(declarer, agents, num_plays + 1, add_to_plays(aPlay,plays))
       {:give, sender} ->
         #IO.puts "controlling got give"
         send sender, {:give, num_plays, plays}
@@ -335,18 +340,6 @@ defmodule Bridge do # {
   def play_winner(control, h1, h2, h3, h4, trumps, leader, winner, round, hand) when leader > winner do
     play_winner(control, h4, h1, h2, h3, trumps, leader - 1, winner, round, hand)
   end
-
-  def play1(control, h1, h2, h3, h4, trumps, leader) do
-    play2(control, h1, h2, h3, h4, trumps, leader, playable(trumps, @nt, h1, []), 0, @nt, 0, [], [])
-  end
-  def play2(_control, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
-  def play2(control, h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
-    new_h1 = remove_card(h1, card)
-    send control, {:starter, :play, [control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
-    #play(control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played])
-
-    play2(control, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
-  end # }
 
   #
   # template
@@ -405,6 +398,21 @@ defmodule Bridge do # {
     play(control, h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
   end # }
 
+  #
+  # play each lead option ... send to a new agent
+  #
+  def play1(control, h1, h2, h3, h4, trumps, leader) do
+    play2(control, h1, h2, h3, h4, trumps, leader, playable(trumps, @nt, h1, []), 0, @nt, 0, [], [])
+  end
+  def play2(_control, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
+  def play2(control, h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
+    new_h1 = remove_card(h1, card)
+    send control, {:starter, :play, [control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
+    #play(control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played])
+
+    play2(control, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
+  end # }
+
   def player([{nh, _}, {eh, _}, {sh, _}, {wh, _}], declarer, trumps) do # {
     #
     # create a process to receive hand plays
@@ -432,20 +440,75 @@ defmodule Bridge do # {
     showHand(winner, tl)
   end
 
-  def showHands(leader, lst, n\\0)
   def showHands(_leader, [], n), do: IO.puts "Total #{n}"
-  def showHands(leader, [hd|tl], n) do
-    IO.write "#{n} "
+  def showHands(leader, [{ns_score, hd}|tl], n) do
+    IO.write "#{n} NS = #{ns_score} "
     showHand(leader, hd)
     showHands(leader, tl, n + 1)
   end
 
   def do_one() do
-    :rand.seed(:exrop, {1, 2, 3})
+    :rand.seed(:exrop, {1, 2, 4})
     hand =  deal()
     show(hand)
     {times, hands} = :timer.tc(fn -> player(hand, north(), spades()) end)
     IO.puts "that took #{times} with #{length(hands)} ways"
-    showHands(@east, hands)
+    #IO.inspect hands
+    showHands(@east, hands, 0)
+    add_to_list(@east, hands, [])
+  end
+
+  def add_to_list(_leader, [], best_so_far), do: best_so_far
+
+  def add_to_list(leader, [first_one|tl], []) do
+    add_to_list(leader, tl, first_one)
+  end
+
+  #
+  # next result is same as best ... keep best and try next
+  #
+  def add_to_list(leader, [{this_ns, _this_play}|tl], best_so_far = {best_ns, best_play}) when this_ns == best_ns do
+    IO.write "Keeping "
+    showHand(leader, best_play)
+    add_to_list(leader, tl, best_so_far)           # same result - try next - keep best
+  end
+  #
+  # next result is different .. zipper for north/south
+  #
+  def add_to_list(leader, [this_hand = {this_ns, this_play}|tl], best_hand = {best_ns, best_play}) do
+    first_diff = first_card_diff(leader, this_play, best_play)
+    IO.puts "best_result = #{best_ns} this_result = #{this_ns} first_diff = #{seatStr(first_diff)}"
+    cond do
+      this_ns > best_ns && (first_diff == @north || first_diff == @south) ->
+        IO.write "better for north "
+        showHand(leader, this_play)
+        add_to_list(leader, tl, this_hand)
+      this_ns < best_ns && (first_diff == @east || first_diff == @west) ->
+        IO.write "better for east "
+        showHand(leader, this_play)
+        add_to_list(leader, tl, this_hand)
+      true ->
+        IO.puts "keeping best"
+        add_to_list(leader, tl, best_hand)
+    end
+  end
+
+  def first_card_diff(leader, [{_this_win, [this_hd|_]}|_], [{_best_win, [best_hd|_]}|_]) when this_hd != best_hd do
+    IO.puts "first_card_diff #{seatStr(leader)} #{cardStr(this_hd)} vs #{cardStr(best_hd)}"
+    leader
+  end
+  def first_card_diff(leader, [{this_win, [this_hd|this_tl]}|this_rest], [{best_win, [best_hd|best_tl]}|best_rest]) when this_hd == best_hd do
+    first_card_diff(rem(leader + 1, 4), [{this_win, this_tl}|this_rest], [{best_win, best_tl}|best_rest])
+  end
+  def first_card_diff(_leader, [{this_win, []}|this_rest], [{_best_win, []}|best_rest]) do
+    first_card_diff(this_win, this_rest, best_rest)
   end
 end # }
+#    IO.puts "add_to_list best"
+#    showHand(leader, best_play)
+#    IO.puts "            next"
+#    showHand(leader, this_play)
+#    IO.puts "----"
+#    #IO.inspect this_play
+#    #zipper(leader, 0, this_play, best_play)
+#    nil
