@@ -33,12 +33,8 @@ defmodule Bridge do # {
   def south, do: @south
   def west,  do: @west
 
-# 2 = 8
-# 3 = 47
-# 4 = 3023
-# 5 = 110439
-  @deck_size 3
-  @deck for x <- 0..3, y <- 2..4, do: {x, y}
+  @deck_size 4
+  @deck for x <- 0..3, y <- 2..5, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -274,30 +270,55 @@ defmodule Bridge do # {
     end
   )
 
-  def getResults(control, sender) do
-    #IO.puts "getResults"
-    send control, {:agents, self()}
-    receive do
-      {:agents, running} ->
-        #IO.puts "getResults got :agents #{running}"
-        cond do
-          running == 0 ->
-            #IO.puts "   got running = 0"
-            send control, {:give, sender}
-          true ->
-            #IO.puts "getResults #{running} running"
-            sleep 500
-            getResults(control, sender)
-        end
+  def first_card_diff(leader, [{_this_win, [this_hd|_]}|_], [{_best_win, [best_hd|_]}|_]) when this_hd != best_hd do
+    leader
+  end
+  def first_card_diff(leader, [{this_win, [this_hd|this_tl]}|this_rest], [{best_win, [best_hd|best_tl]}|best_rest]) when this_hd == best_hd do
+    first_card_diff(rem(leader + 1, 4), [{this_win, this_tl}|this_rest], [{best_win, best_tl}|best_rest])
+  end
+  def first_card_diff(_leader, [{this_win, []}|this_rest], [{_best_win, []}|best_rest]) do
+    first_card_diff(this_win, this_rest, best_rest)
+  end
+
+  def add_to_play(leader, first_one = {first_ns, first_play}, []) do
+#    IO.write "first #{first_ns} "
+#    showHand(leader, first_play)
+    first_one
+  end
+
+  def add_to_play(leader, this_hand = {this_ns, this_play}, _best_so_far = {best_ns, _best_play}) when this_ns == best_ns do
+#    IO.write "same  #{best_ns} "
+#    showHand(leader, this_play)
+    this_hand
+    #best_so_far
+  end
+  #
+  # next result is different .. zipper for north/south
+  #
+  def add_to_play(leader, this_hand = {this_ns, this_play}, best_hand = {best_ns, best_play}) do
+    first_diff = first_card_diff(leader, this_play, best_play)
+    #IO.puts "best_result = #{best_ns} this_result = #{this_ns} first_diff = #{seatStr(first_diff)}"
+    cond do
+      this_ns > best_ns && (first_diff == @north || first_diff == @south) ->
+#        IO.write "north #{this_ns} "
+#        showHand(leader, this_play)
+        this_hand
+      this_ns < best_ns && (first_diff == @east || first_diff == @west) ->
+#        IO.write "east  #{this_ns} "
+#        showHand(leader, this_play)
+        this_hand
+      true ->
+#        IO.write "keep  #{best_ns} "
+#        showHand(leader, best_play)
+        best_hand
     end
   end
   def score_hand([], n_s), do: n_s
   def score_hand([{@north, _play}|rest], n_s), do: score_hand(rest, n_s + 1)
   def score_hand([{@south, _play}|rest], n_s), do: score_hand(rest, n_s + 1)
   def score_hand([{_,      _play}|rest], n_s), do: score_hand(rest, n_s)
-  def add_to_plays(aPlay, plays), do: [{score_hand(aPlay, 0), aPlay}|plays]
 
-  def controlling(declarer, agents, num_plays, plays) do
+  def controlling(declarer, leader, agents, num_plays, plays) do
     receive do
       {:add, aPlay} ->
         #IO.puts "controlling.add"
@@ -305,26 +326,25 @@ defmodule Bridge do # {
         #  0 -> IO.write "#{num_plays}\r"
         #  _ -> nil
         #end
-        #controlling(declarer, agents, num_plays + 1, [aPlay|plays])
-        controlling(declarer, agents, num_plays + 1, add_to_plays(aPlay,plays))
+        controlling(declarer, leader, agents, num_plays + 1, add_to_play(leader, {score_hand(aPlay, 0),aPlay},plays))
       {:give, sender} ->
         #IO.puts "controlling got give"
         send sender, {:give, num_plays, plays}
-        controlling(declarer, agents, num_plays, plays)
+        controlling(declarer, leader, agents, num_plays, plays)
       {:DOWN, _, _, _, _} ->
-        IO.puts "end #{agents}"
+        #IO.puts "end #{agents}"
         case agents do
           1 -> plays
-          _ -> controlling(declarer, agents - 1, num_plays, plays)
+          _ -> controlling(declarer, leader, agents - 1, num_plays, plays)
         end
       {:starter, function, args} ->
-        IO.puts "start #{agents}"
+        #IO.puts "start #{agents}"
         spawn_monitor(Bridge, function, args)
-        controlling(declarer, agents + 1, num_plays, plays)
+        controlling(declarer, leader, agents + 1, num_plays, plays)
       {:agents, sender} ->
         #IO.puts "agents got :agents"
         send sender, {:agents, agents}
-        controlling(declarer, agents, num_plays, plays)
+        controlling(declarer, leader, agents, num_plays, plays)
     end
   end
 
@@ -424,7 +444,7 @@ defmodule Bridge do # {
       @south -> play1(self(), wh, nh, eh, sh, trumps, @west)
       @west  -> play1(self(), nh, eh, sh, wh, trumps, @north)
     end
-    controlling(declarer, 0, 0, [])
+    controlling(declarer, rem(declarer + 1, 4), 0, 0, [])
   end # }
 
   def showPlay([]), do: IO.write ") "
@@ -448,67 +468,12 @@ defmodule Bridge do # {
   end
 
   def do_one() do
-    :rand.seed(:exrop, {1, 2, 4})
+    #:rand.seed(:exrop, {1, 2, 4})
     hand =  deal()
     show(hand)
-    {times, hands} = :timer.tc(fn -> player(hand, north(), spades()) end)
-    IO.puts "that took #{times} with #{length(hands)} ways"
-    #IO.inspect hands
-    showHands(@east, hands, 0)
-    add_to_list(@east, hands, [])
-  end
-
-  def add_to_list(_leader, [], best_so_far), do: best_so_far
-
-  def add_to_list(leader, [first_one|tl], []) do
-    add_to_list(leader, tl, first_one)
-  end
-
-  #
-  # next result is same as best ... keep best and try next
-  #
-  def add_to_list(leader, [{this_ns, _this_play}|tl], best_so_far = {best_ns, best_play}) when this_ns == best_ns do
-    IO.write "Keeping "
-    showHand(leader, best_play)
-    add_to_list(leader, tl, best_so_far)           # same result - try next - keep best
-  end
-  #
-  # next result is different .. zipper for north/south
-  #
-  def add_to_list(leader, [this_hand = {this_ns, this_play}|tl], best_hand = {best_ns, best_play}) do
-    first_diff = first_card_diff(leader, this_play, best_play)
-    IO.puts "best_result = #{best_ns} this_result = #{this_ns} first_diff = #{seatStr(first_diff)}"
-    cond do
-      this_ns > best_ns && (first_diff == @north || first_diff == @south) ->
-        IO.write "better for north "
-        showHand(leader, this_play)
-        add_to_list(leader, tl, this_hand)
-      this_ns < best_ns && (first_diff == @east || first_diff == @west) ->
-        IO.write "better for east "
-        showHand(leader, this_play)
-        add_to_list(leader, tl, this_hand)
-      true ->
-        IO.puts "keeping best"
-        add_to_list(leader, tl, best_hand)
-    end
-  end
-
-  def first_card_diff(leader, [{_this_win, [this_hd|_]}|_], [{_best_win, [best_hd|_]}|_]) when this_hd != best_hd do
-    IO.puts "first_card_diff #{seatStr(leader)} #{cardStr(this_hd)} vs #{cardStr(best_hd)}"
-    leader
-  end
-  def first_card_diff(leader, [{this_win, [this_hd|this_tl]}|this_rest], [{best_win, [best_hd|best_tl]}|best_rest]) when this_hd == best_hd do
-    first_card_diff(rem(leader + 1, 4), [{this_win, this_tl}|this_rest], [{best_win, best_tl}|best_rest])
-  end
-  def first_card_diff(_leader, [{this_win, []}|this_rest], [{_best_win, []}|best_rest]) do
-    first_card_diff(this_win, this_rest, best_rest)
+    {times, {ns, play}} = :timer.tc(fn -> player(hand, north(), spades()) end)
+    IO.puts "that took #{times} "
+    IO.write "NS = #{ns} "
+    showHand(@east, play)
   end
 end # }
-#    IO.puts "add_to_list best"
-#    showHand(leader, best_play)
-#    IO.puts "            next"
-#    showHand(leader, this_play)
-#    IO.puts "----"
-#    #IO.inspect this_play
-#    #zipper(leader, 0, this_play, best_play)
-#    nil
