@@ -33,8 +33,8 @@ defmodule Bridge do # {
   def south, do: @south
   def west,  do: @west
 
-  @deck_size 7
-  @deck for x <- 0..3, y <- 2..8, do: {x, y}
+  @deck_size 4
+  @deck for x <- 0..3, y <- 2..4, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -326,25 +326,36 @@ defmodule Bridge do # {
         #  0 -> IO.write "#{num_plays}\r"
         #  _ -> nil
         #end
-        controlling(declarer, leader, agents, num_plays + 1, add_to_play(leader, {score_hand(aPlay, 0),aPlay},plays))
+      #  showHand(leader, aPlay)
+      #  IO.puts " score = #{score_hand(aPlay, 0)}"
+        new_plays = add_to_play(leader, {score_hand(aPlay, 0),aPlay},plays)
+        controlling(declarer, leader, agents, num_plays + 1, new_plays)
       {:give, sender} ->
         #IO.puts "controlling got give"
         send sender, {:give, num_plays, plays}
         controlling(declarer, leader, agents, num_plays, plays)
       {:DOWN, _, _, _, _} ->
-        #IO.puts "end #{agents}"
+        IO.puts "end #{agents}"
         case agents do
           1 -> plays
           _ -> controlling(declarer, leader, agents - 1, num_plays, plays)
         end
       {:starter, function, args} ->
-        #IO.puts "start #{agents}"
-        spawn_monitor(Bridge, function, args)
+        IO.puts "start #{agents}"
+        case agents do
+          0 -> Node.spawn_link(:node@laptop, Bridge, function, args)
+          _ -> spawn_monitor(Bridge, function, args)
+        end
         controlling(declarer, leader, agents + 1, num_plays, plays)
-      {:agents, sender} ->
-        #IO.puts "agents got :agents"
-        send sender, {:agents, agents}
-        controlling(declarer, leader, agents, num_plays, plays)
+      { msg} ->
+        IO.puts "Got a msg!"
+        IO.inspect msg
+        exit(:dying)
+
+#      {:agents, sender} ->
+#        #IO.puts "agents got :agents"
+#        send sender, {:agents, agents}
+#        controlling(declarer, leader, agents, num_plays, plays)
     end
   end
 
@@ -444,10 +455,11 @@ defmodule Bridge do # {
       @south -> play1(self(), wh, nh, eh, sh, trumps, @west)
       @west  -> play1(self(), nh, eh, sh, wh, trumps, @north)
     end
+    Process.flag(:trap_exit, true)
     controlling(declarer, rem(declarer + 1, 4), 0, 0, [])
   end # }
 
-  def showPlay([]), do: IO.write ") "
+  def showPlay([]), do: IO.write ")"
   def showPlay([card|rest]) do
     IO.write "#{cardStr(card)} "
     showPlay(rest)
@@ -457,6 +469,7 @@ defmodule Bridge do # {
   def showHand(leader, [{winner, rounds}|tl]) do
     IO.write "#{String.slice(seatStr(leader), 0..0)}("
     showPlay(rounds)
+    IO.write "=#{String.slice(seatStr(winner), 0..0)} "
     showHand(winner, tl)
   end
 
@@ -468,7 +481,15 @@ defmodule Bridge do # {
   end
 
   def do_one() do
-    #:rand.seed(:exrop, {1, 2, 4})
+    case Node.connect(:node@laptop) do
+      true ->
+        IO.puts "connected to laptop"
+      false ->
+        IO.puts "oops no laptop"
+        exit(:no_laptop)
+    end
+    IO.puts "on arch #{Node.self()}"
+    :rand.seed(:exrop, {1, 2, 4})
     hand =  deal()
     show(hand)
     {times, {ns, play}} = :timer.tc(fn -> player(hand, north(), spades()) end)
