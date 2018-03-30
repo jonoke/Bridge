@@ -34,7 +34,7 @@ defmodule Bridge do # {
   def west,  do: @west
 
   @deck_size 4
-  @deck for x <- 0..3, y <- 2..4, do: {x, y}
+  @deck for x <- 0..3, y <- 2..3, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
