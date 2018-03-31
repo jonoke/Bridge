@@ -33,8 +33,8 @@ defmodule Bridge do # {
   def south, do: @south
   def west,  do: @west
 
-  @deck_size 4
-  @deck for x <- 0..3, y <- 2..3, do: {x, y}
+  @deck_size 1
+  @deck for x <- 0..3, y <- 2..2, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
@@ -259,6 +259,27 @@ defmodule Bridge do # {
     show_cards(tl)
   end
 
+  def showPlay([]), do: IO.write ")"
+  def showPlay([card|rest]) do
+    IO.write "#{cardStr(card)} "
+    showPlay(rest)
+  end
+
+  def showHand(_, []), do: IO.puts "_"
+  def showHand(leader, [{winner, rounds}|tl]) do
+    IO.write "#{String.slice(seatStr(leader), 0..0)}("
+    showPlay(rounds)
+    IO.write "=#{String.slice(seatStr(winner), 0..0)} "
+    showHand(winner, tl)
+  end
+
+  def showHands(_leader, [], n), do: IO.puts "Total #{n}"
+  def showHands(leader, [{ns_score, hd}|tl], n) do
+    IO.write "#{n} NS = #{ns_score} "
+    showHand(leader, hd)
+    showHands(leader, tl, n + 1)
+  end
+
   def wins(trumps, played, winning \\ nil, pos \\ 0, who \\ 0)
   def wins(_trumps, [], winner, _pos, who), do: {winner, who}
   def wins(trumps, [hd|tl], nil, pos, who), do: wins(trumps, tl, hd, pos + 1, who)
@@ -280,9 +301,9 @@ defmodule Bridge do # {
     first_card_diff(this_win, this_rest, best_rest)
   end
 
-  def add_to_play(leader, first_one = {first_ns, first_play}, []) do
-#    IO.write "first #{first_ns} "
-#    showHand(leader, first_play)
+  def add_to_play(leader, first_one = {first_ns, first_play}, nil) do
+    IO.write "first #{first_ns} "
+    showHand(leader, first_play)
     first_one
   end
 
@@ -318,46 +339,6 @@ defmodule Bridge do # {
   def score_hand([{@south, _play}|rest], n_s), do: score_hand(rest, n_s + 1)
   def score_hand([{_,      _play}|rest], n_s), do: score_hand(rest, n_s)
 
-  def controlling(declarer, leader, agents, num_plays, plays) do
-    receive do
-      {:add, aPlay} ->
-        #IO.puts "controlling.add"
-        #case rem(num_plays, 100000) do
-        #  0 -> IO.write "#{num_plays}\r"
-        #  _ -> nil
-        #end
-      #  showHand(leader, aPlay)
-      #  IO.puts " score = #{score_hand(aPlay, 0)}"
-        new_plays = add_to_play(leader, {score_hand(aPlay, 0),aPlay},plays)
-        controlling(declarer, leader, agents, num_plays + 1, new_plays)
-      {:give, sender} ->
-        #IO.puts "controlling got give"
-        send sender, {:give, num_plays, plays}
-        controlling(declarer, leader, agents, num_plays, plays)
-      {:DOWN, _, _, _, _} ->
-        IO.puts "end #{agents}"
-        case agents do
-          1 -> plays
-          _ -> controlling(declarer, leader, agents - 1, num_plays, plays)
-        end
-      {:starter, function, args} ->
-        IO.puts "start #{agents}"
-        case agents do
-          0 -> Node.spawn_link(:node@laptop, Bridge, function, args)
-          _ -> spawn_monitor(Bridge, function, args)
-        end
-        controlling(declarer, leader, agents + 1, num_plays, plays)
-      { msg} ->
-        IO.puts "Got a msg!"
-        IO.inspect msg
-        exit(:dying)
-
-#      {:agents, sender} ->
-#        #IO.puts "agents got :agents"
-#        send sender, {:agents, agents}
-#        controlling(declarer, leader, agents, num_plays, plays)
-    end
-  end
 
   #
   # rotate h1 - h4 relative to winner
@@ -381,6 +362,7 @@ defmodule Bridge do # {
   # end of play ... return reversed play
   # 
   def play(control, _h1, _h2, _h3, _h4, _trumps, _leader, _playable, @deck_size, _lead_suit, _position, hand, _played) do
+    IO.puts "in play - adding"
     send control, {:add, reverse(hand)}
   end
 
@@ -388,6 +370,7 @@ defmodule Bridge do # {
   # end of one round
   #
   def play(control, h1, h2, h3, h4, trumps, leader, _playable, round, _lead_suit, 4, hand, played) do # {
+    IO.puts "in play - end of round"
     played = reverse(played)
     {_card, winner} = wins(trumps, played)
     winner = rem(leader + winner, 4)
@@ -395,15 +378,18 @@ defmodule Bridge do # {
   end # }
 
   #
-  # what is this ... ??
+  # ... this is trapping end of alternate plays : playable = []
   #
-  def play(_control, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
+  def play(_control, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: (
+    IO.puts "in play - unknown"
+    nil
+  )
 
   #
   # When playable is nil it means get list of playable cards appropriate to the card lead (= @nt if this is the lead)
   #
   def play(control, h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
-    #IO.puts "play A #{round} #{position}"
+    IO.puts "in play - A #{round} #{position}"
     play(control, h1, h2, h3, h4, trumps, leader, playable(trumps, lead_suit, h1, played), round, lead_suit, position, hand, played)
   end # }
 
@@ -412,7 +398,7 @@ defmodule Bridge do # {
   #
   def play(control, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
     {lead_suit, _} = card
-    #IO.puts "play B #{round} #{position} #{cardStr(card)}"
+    IO.puts "in play - B #{round} #{position} #{cardStr(card)}"
     new_h1 = remove_card(h1, card)
     play(control, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
 
@@ -423,7 +409,7 @@ defmodule Bridge do # {
   # Play a card to a lead
   #
   def play(control, h1, h2, h3, h4, trumps, leader, [card|rest], round, lead_suit, position, hand, played) do # {
-    #IO.puts "play C #{round} #{position} #{cardStr(card)}"
+    IO.puts "in play - C #{round} #{position} #{cardStr(card)}"
     new_h1 = remove_card(h1, card)
     play(control, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
     play(control, h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
@@ -432,16 +418,64 @@ defmodule Bridge do # {
   #
   # play each lead option ... send to a new agent
   #
-  def play1(control, h1, h2, h3, h4, trumps, leader) do
-    play2(control, h1, h2, h3, h4, trumps, leader, playable(trumps, @nt, h1, []), 0, @nt, 0, [], [])
+  def play1(h1, h2, h3, h4, trumps, leader) do
+    play2(h1, h2, h3, h4, trumps, leader, playable(trumps, @nt, h1, []), 0, @nt, 0, [], [])
   end
-  def play2(_control, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
-  def play2(control, h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
+  def play2(_h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
+  def play2(h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
     new_h1 = remove_card(h1, card)
-    send control, {:starter, :play, [control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
-    #play(control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played])
+    send self(), {:starter, :play, [h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
+    #play(h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played])
 
-    play2(control, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
+    play2(h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
+  end # }
+
+  def controlling(master, declarer, leader, agents, num_plays, plays) do # {
+    receive do # {
+      {:final, aResult} ->
+        new_plays = add_to_play(leader, aResult, plays)
+        controlling(master, declarer, leader, agents, num_plays, new_plays)
+      {:add, aPlay} ->
+        IO.puts "playing #{Node.self()} :add"
+#        case rem(num_plays, 100) do
+#          0 -> IO.write "#{num_plays}\r"
+#          _ -> nil
+        end
+        #showHand(leader, aPlay)
+        #IO.puts " score = #{score_hand(aPlay, 0)}"
+        controlling(master, declarer, leader, agents, num_plays + 1, new_plays)
+      {:DOWN, _, _, _, _} ->
+        IO.puts "DOWN #{Node.self()} #{agents}"
+        case agents do
+          1 ->
+            send master, {:final, plays}
+
+          _ -> controlling(master, declarer, leader, agents - 1, num_plays, plays)
+        end
+      {:EXIT, _, _} ->
+        IO.puts "EXIT #{Node.self()} #{agents}"
+        exit(:this_is_bad)
+      {:starter, function, args} ->
+        IO.puts "start #{Node.self()} #{agents}"
+        case agents do
+#          0 ->
+#            IO.puts "about to spawn on laptop"
+#            x = Node.spawn_link(:node@laptop, Bridge, function, args)
+#            IO.inspect x
+#          1 ->
+#            IO.puts "about to spawn on laptop"
+#            x = Node.spawn_link(:node@laptop, Bridge, function, args)
+#            IO.inspect x
+          _ ->
+            send master, {:add_agent}
+            spawn_monitor(Bridge, function, args)
+        end
+        controlling(master, declarer, leader, agents + 1, num_plays, plays)
+      msg ->
+        IO.puts "Got a msg!"
+        IO.inspect msg
+        exit(:dying)
+    end # }
   end # }
 
   def player([{nh, _}, {eh, _}, {sh, _}, {wh, _}], declarer, trumps) do # {
@@ -459,25 +493,9 @@ defmodule Bridge do # {
     controlling(declarer, rem(declarer + 1, 4), 0, 0, [])
   end # }
 
-  def showPlay([]), do: IO.write ")"
-  def showPlay([card|rest]) do
-    IO.write "#{cardStr(card)} "
-    showPlay(rest)
-  end
-
-  def showHand(_, []), do: IO.puts "_"
-  def showHand(leader, [{winner, rounds}|tl]) do
-    IO.write "#{String.slice(seatStr(leader), 0..0)}("
-    showPlay(rounds)
-    IO.write "=#{String.slice(seatStr(winner), 0..0)} "
-    showHand(winner, tl)
-  end
-
-  def showHands(_leader, [], n), do: IO.puts "Total #{n}"
-  def showHands(leader, [{ns_score, hd}|tl], n) do
-    IO.write "#{n} NS = #{ns_score} "
-    showHand(leader, hd)
-    showHands(leader, tl, n + 1)
+  def setup() do
+    playing = spawn(Bridge, :playing, [])
+    controlling = spawn(Bridge, :controlling, [])
   end
 
   def do_one() do
@@ -488,6 +506,7 @@ defmodule Bridge do # {
         IO.puts "oops no laptop"
         exit(:no_laptop)
     end
+    laptop = Node.spawn(:node@laptop, Bridge, :controlling, [])
     IO.puts "on arch #{Node.self()}"
     :rand.seed(:exrop, {1, 2, 4})
     hand =  deal()
@@ -497,4 +516,6 @@ defmodule Bridge do # {
     IO.write "NS = #{ns} "
     showHand(@east, play)
   end
+
+
 end # }
