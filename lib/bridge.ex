@@ -418,16 +418,16 @@ defmodule Bridge do # {
   #
   # play each lead option ... send to a new agent
   #
-  def play1(h1, h2, h3, h4, trumps, leader) do
-    play2(h1, h2, h3, h4, trumps, leader, playable(trumps, @nt, h1, []), 0, @nt, 0, [], [])
+  def play1(master, nodes, h1, h2, h3, h4, trumps, leader) do
+    play2(master, nodes, h1, h2, h3, h4, trumps, leader, playable(trumps, @nt, h1, []), 0, @nt, 0, [], [])
   end
-  def play2(_h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
-  def play2(h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
+  def play2(master, nodes, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
+  def play2(master, nodes, h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
     new_h1 = remove_card(h1, card)
-    send self(), {:starter, :play, [h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
+    send Stream.take(nodes, 1), {:starter, :play, [h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
     #play(h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played])
 
-    play2(h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
+    play2(master, nodes, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
   end # }
 
   def controlling(master, declarer, leader, agents, num_plays, plays) do # {
@@ -440,16 +440,16 @@ defmodule Bridge do # {
 #        case rem(num_plays, 100) do
 #          0 -> IO.write "#{num_plays}\r"
 #          _ -> nil
-        end
+#        end
         #showHand(leader, aPlay)
-        #IO.puts " score = #{score_hand(aPlay, 0)}"
+        score = score_hand(aPlay, 0)
+        #IO.puts " score = #{score}"
+        new_plays = add_to_play(leader, {score, aPlay}, plays)
         controlling(master, declarer, leader, agents, num_plays + 1, new_plays)
       {:DOWN, _, _, _, _} ->
         IO.puts "DOWN #{Node.self()} #{agents}"
         case agents do
-          1 ->
-            send master, {:final, plays}
-
+          1 -> send master, {:final, plays}
           _ -> controlling(master, declarer, leader, agents - 1, num_plays, plays)
         end
       {:EXIT, _, _} ->
@@ -478,44 +478,50 @@ defmodule Bridge do # {
     end # }
   end # }
 
-  def player([{nh, _}, {eh, _}, {sh, _}, {wh, _}], declarer, trumps) do # {
+  def player(nodes, [{nh, _}, {eh, _}, {sh, _}, {wh, _}], declarer, trumps) do # {
     #
     # create a process to receive hand plays
     #
 
     case declarer do
-      @north -> play1(self(), eh, sh, wh, nh, trumps, @east)
-      @east  -> play1(self(), sh, wh, nh, eh, trumps, @south)
-      @south -> play1(self(), wh, nh, eh, sh, trumps, @west)
-      @west  -> play1(self(), nh, eh, sh, wh, trumps, @north)
+      @north -> play1(self(), nodes, eh, sh, wh, nh, trumps, @east)
+      @east  -> play1(self(), nodes, sh, wh, nh, eh, trumps, @south)
+      @south -> play1(self(), nodes, wh, nh, eh, sh, trumps, @west)
+      @west  -> play1(self(), nodes, nh, eh, sh, wh, trumps, @north)
     end
     Process.flag(:trap_exit, true)
-    controlling(declarer, rem(declarer + 1, 4), 0, 0, [])
+    controlling(master, declarer, rem(declarer + 1, 4), 0, 0, [])
   end # }
 
-  def setup() do
-    playing = spawn(Bridge, :playing, [])
-    controlling = spawn(Bridge, :controlling, [])
+  def valid_nodes([], nodes), do: nodes
+  def valid_nodes([hd|tl], nodes) do
+    case Node.connect(hd) do
+      true -> do_nodes(tl, [hd|nodes])
+      false -> do_nodes(tl, nodes)
+    end
   end
 
   def do_one() do
-    case Node.connect(:node@laptop) do
-      true ->
-        IO.puts "connected to laptop"
-      false ->
-        IO.puts "oops no laptop"
-        exit(:no_laptop)
-    end
-    laptop = Node.spawn(:node@laptop, Bridge, :controlling, [])
-    IO.puts "on arch #{Node.self()}"
-    :rand.seed(:exrop, {1, 2, 4})
-    hand =  deal()
-    show(hand)
-    {times, {ns, play}} = :timer.tc(fn -> player(hand, north(), spades()) end)
-    IO.puts "that took #{times} "
-    IO.write "NS = #{ns} "
-    showHand(@east, play)
+    #nodes = [ :"one@jon-Z930", :"two@jon-Z930" ]
+    nodes = [ :"one@jon-Z930" ]
+    IO.inspect nodes
+    IO.puts "---"
+    IO.inspect valid_nodes(nodes)
+#    case Node.connect(:node@laptop) do
+#      true ->
+#        IO.puts "connected to laptop"
+#      false ->
+#        IO.puts "oops no laptop"
+#        exit(:no_laptop)
+#    end
+#    laptop = Node.spawn(:node@laptop, Bridge, :controlling, [])
+#    IO.puts "on arch #{Node.self()}"
+#    :rand.seed(:exrop, {1, 2, 4})
+#    hand =  deal()
+#    show(hand)
+#    {times, {ns, play}} = :timer.tc(fn -> player(Stream.cycle(nodes), hand, north(), spades()) end)
+#    IO.puts "that took #{times} "
+#    IO.write "NS = #{ns} "
+#    showHand(@east, play)
   end
-
-
 end # }
