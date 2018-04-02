@@ -4,7 +4,6 @@ defmodule Bridge do # {
   """
 
   import Enum, only: [ reverse: 1 ]
-  import :timer, only: [sleep: 1]
 
   def seats, do: { :North, :East, :South, :West }
   def suits, do: { :Clubs, :Diamonds, :Hearts, :Spades, :NoTrumps }
@@ -274,26 +273,57 @@ defmodule Bridge do # {
     end
   )
 
-  def getResults(control, sender) do
-    #IO.puts "getResults"
-    send control, {:agents, self()}
-    receive do
-      {:agents, running} ->
-        #IO.puts "getResults got :agents #{running}"
-        cond do
-          running == 0 ->
-            #IO.puts "   got running = 0"
-            send control, {:give, sender}
-          true ->
-            #IO.puts "getResults #{running} running"
-            sleep 500
-            getResults(control, sender)
-        end
+  def first_card_diff(leader, [{_a_win, [a_hd|_]}|_], [{_the_win, [the_hd|_]}|_]) when a_hd != the_hd do
+    leader
+  end
+  def first_card_diff(leader, [{a_win, [a_hd|a_tl]}|a_rest], [{the_win, [the_hd|the_tl]}|the_rest]) when a_hd == the_hd do
+    first_card_diff(rem(leader + 1, 4), [{a_win, a_tl}|a_rest], [{the_win, the_tl}|the_rest])
+  end
+  def first_card_diff(_leader, [{a_win, []}|a_rest], [{_the_win, []}|the_rest]) do
+    first_card_diff(a_win, a_rest, the_rest)
+  end
+
+  def add_to_play(leader, first_one = {first_ns, first_play}, nil) do
+    IO.write "first #{first_ns} "
+    showHand(leader, first_play)
+    first_one
+  end
+
+  def add_to_play(_leader, a_hand = {a_ns, _a_play}, _best_so_far = {best_ns, _best_play}) when a_ns == best_ns do
+#    IO.write "same  #{best_ns} "
+#    showHand(leader, a_play)
+    a_hand
+    #best_so_far
+  end
+  #
+  # next result is different .. zipper for north/south
+  #
+  def add_to_play(leader, this_hand = {this_ns, this_play}, best_hand = {best_ns, best_play}) do
+    first_diff = first_card_diff(leader, this_play, best_play)
+    #IO.puts "best_result = #{best_ns} this_result = #{this_ns} first_diff = #{seatStr(first_diff)}"
+    cond do
+      this_ns > best_ns && (first_diff == @north || first_diff == @south) ->
+#        IO.write "north #{this_ns} "
+#        showHand(leader, this_play)
+        this_hand
+      this_ns < best_ns && (first_diff == @east || first_diff == @west) ->
+#        IO.write "east  #{this_ns} "
+#        showHand(leader, this_play)
+        this_hand
+      true ->
+#        IO.write "keep  #{best_ns} "
+#        showHand(leader, best_play)
+        best_hand
     end
   end
-  def add_to_plays(aPlay, plays) do
-  end
-  def controlling(declarer, agents, num_plays, plays) do
+
+  def score_hand([], n_s), do: n_s
+  def score_hand([{@north, _play}|rest], n_s), do: score_hand(rest, n_s + 1)
+  def score_hand([{@south, _play}|rest], n_s), do: score_hand(rest, n_s + 1)
+  def score_hand([{_,      _play}|rest], n_s), do: score_hand(rest, n_s)
+
+
+  def controlling(leader, agents, num_plays, plays) do
     receive do
       {:add, aPlay} ->
         #IO.puts "controlling.add"
@@ -301,25 +331,28 @@ defmodule Bridge do # {
         #  0 -> IO.write "#{num_plays}\r"
         #  _ -> nil
         #end
-        controlling(declarer, agents, num_plays + 1, [aPlay|plays])
+        score = score_hand(aPlay, 0)
+        #IO.puts " score = #{score}"
+        new_plays = add_to_play(leader, {score, aPlay}, plays)
+        controlling(leader, agents, num_plays + 1, new_plays)
       {:give, sender} ->
         #IO.puts "controlling got give"
         send sender, {:give, num_plays, plays}
-        controlling(declarer, agents, num_plays, plays)
+        controlling(leader, agents, num_plays, plays)
       {:DOWN, _, _, _, _} ->
         IO.puts "end #{agents}"
         case agents do
           1 -> plays
-          _ -> controlling(declarer, agents - 1, num_plays, plays)
+          _ -> controlling(leader, agents - 1, num_plays, plays)
         end
       {:starter, function, args} ->
         IO.puts "start #{agents}"
         spawn_monitor(Bridge, function, args)
-        controlling(declarer, agents + 1, num_plays, plays)
+        controlling(leader, agents + 1, num_plays, plays)
       {:agents, sender} ->
         #IO.puts "agents got :agents"
         send sender, {:agents, agents}
-        controlling(declarer, agents, num_plays, plays)
+        controlling(leader, agents, num_plays, plays)
     end
   end
 
@@ -339,7 +372,9 @@ defmodule Bridge do # {
   def play1(control, h1, h2, h3, h4, trumps, leader) do
     play2(control, h1, h2, h3, h4, trumps, leader, playable(trumps, @nt, h1, []), 0, @nt, 0, [], [])
   end
-  def play2(_control, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
+
+  def play2(_control, _h1, _h2, _h3, _h4, _trumps, leader, [], _round, _lead_suit, _position, _hand, _played), do: leader
+
   def play2(control, h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
     new_h1 = remove_card(h1, card)
     send control, {:starter, :play, [control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
@@ -410,13 +445,13 @@ defmodule Bridge do # {
     # create a process to receive hand plays
     #
 
-    case declarer do
+    leader = case declarer do
       @north -> play1(self(), eh, sh, wh, nh, trumps, @east)
       @east  -> play1(self(), sh, wh, nh, eh, trumps, @south)
       @south -> play1(self(), wh, nh, eh, sh, trumps, @west)
       @west  -> play1(self(), nh, eh, sh, wh, trumps, @north)
     end
-    controlling(declarer, 0, 0, [])
+    controlling(leader, 0, 0, nil)
   end # }
 
   def showPlay([]), do: IO.write ") "
@@ -444,8 +479,9 @@ defmodule Bridge do # {
     :rand.seed(:exrop, {1, 2, 3})
     hand =  deal()
     show(hand)
-    {times, hands} = :timer.tc(fn -> player(hand, north(), spades()) end)
-    IO.puts "that took #{times} with #{length(hands)} ways"
-    showHands(@east, hands)
+    {times, {ns, play}} = :timer.tc(fn -> player(hand, north(), spades()) end)
+    IO.puts "that took #{times} "
+    IO.write "NS = #{ns} "
+    showHand(@east, play)
   end
 end # }
