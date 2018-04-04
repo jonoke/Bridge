@@ -5,10 +5,10 @@ defmodule Bridge do # {
 
   import Enum, only: [ reverse: 1 ]
 
-  def seats, do: { :North, :East, :South, :West }
-  def suits, do: { :Clubs, :Diamonds, :Hearts, :Spades, :NoTrumps }
+  def seats,  do: { :North, :East, :South, :West }
+  def suits,  do: { :Clubs, :Diamonds, :Hearts, :Spades, :NoTrumps }
   def suits1, do: { :C, :D, :H, :S, :NT }
-  def ranks, do: { 0, 0, 2, 3, 4, 5, 6, 7, 8, 9, :T, :J, :Q, :K, :A }
+  def ranks,  do: { 0, 0, 2, 3, 4, 5, 6, 7, 8, 9, :T, :J, :Q, :K, :A }
 
   @cl 0
   @di 1
@@ -32,18 +32,15 @@ defmodule Bridge do # {
   def south, do: @south
   def west,  do: @west
 
-# 2 = 8
-# 3 = 47
-# 4 = 3023
-# 5 = 110439
   @deck_size 3
   @deck for x <- 0..3, y <- 2..4, do: {x, y}
 
   #@deck_size 13
   #@deck for x <- 0..3, y <- 2..14, do: {x, y}
 
-  def deck, do: @deck 
+  def deck_size, do: @deck_size
 
+  def deck, do: @deck 
   def hcp({_,rank}), do: max(0, rank - 10)
 
   def slot(card, []), do: [card]
@@ -226,29 +223,29 @@ defmodule Bridge do # {
 
   def playable(_trumps,@nt, {cl,di,he,sp}, _played), do: cl ++ di ++ he ++ sp
 
-  def playable(@cl,    @cl, {[],di,he,sp}, _played), do:         smallest_of_each(di,he,sp)
-  def playable(@di,    @cl, {[],di,he,sp}, _played), do: all_and_smallest_of_each(di,he,sp)
-  def playable(@he,    @cl, {[],di,he,sp}, _played), do: all_and_smallest_of_each(he,di,sp)
-  def playable(@sp,    @cl, {[],di,he,sp}, _played), do: all_and_smallest_of_each(sp,di,he)
-  def playable(_trumps,@cl, {cl,_d,_h,_s},  played), do: all_larger_and_smallest(@cl, played, cl)
+  def playable(@cl,@cl,{[],di,he,sp}, _played), do:         smallest_of_each(di,he,sp)
+  def playable(@di,@cl,{[],di,he,sp}, _played), do: all_and_smallest_of_each(di,he,sp)
+  def playable(@he,@cl,{[],di,he,sp}, _played), do: all_and_smallest_of_each(he,di,sp)
+  def playable(@sp,@cl,{[],di,he,sp}, _played), do: all_and_smallest_of_each(sp,di,he)
+  def playable(_,  @cl,{cl,_d,_h,_s},  played), do: all_larger_and_smallest(@cl, played, cl)
 
-  def playable(@cl,    @di, {cl,[],he,sp}, _played), do: all_and_smallest_of_each(cl,he,sp)
-  def playable(@di,    @di, {cl,[],he,sp}, _played), do:         smallest_of_each(cl,he,sp)
-  def playable(@he,    @di, {cl,[],he,sp}, _played), do: all_and_smallest_of_each(he,cl,sp)
-  def playable(@sp,    @di, {cl,[],he,sp}, _played), do: all_and_smallest_of_each(sp,cl,he)
-  def playable(_trumps,@di, {_c,di,_h,_s},  played), do: all_larger_and_smallest(@di, played, di)
+  def playable(@cl,@di,{cl,[],he,sp}, _played), do: all_and_smallest_of_each(cl,he,sp)
+  def playable(@di,@di,{cl,[],he,sp}, _played), do:         smallest_of_each(cl,he,sp)
+  def playable(@he,@di,{cl,[],he,sp}, _played), do: all_and_smallest_of_each(he,cl,sp)
+  def playable(@sp,@di,{cl,[],he,sp}, _played), do: all_and_smallest_of_each(sp,cl,he)
+  def playable(_,  @di,{_c,di,_h,_s},  played), do: all_larger_and_smallest(@di, played, di)
 
-  def playable(@cl,    @he, {cl,di,[],sp}, _played), do: all_and_smallest_of_each(cl,di,sp)
-  def playable(@di,    @he, {cl,di,[],sp}, _played), do: all_and_smallest_of_each(di,cl,sp)
-  def playable(@he,    @he, {cl,di,[],sp}, _played), do:         smallest_of_each(cl,di,sp)
-  def playable(@sp,    @he, {cl,di,[],sp}, _played), do: all_and_smallest_of_each(sp,cl,di)
-  def playable(_trumps,@he, {_c,_d,he,_s},  played), do: all_larger_and_smallest(@he, played, he)
+  def playable(@cl,@he,{cl,di,[],sp}, _played), do: all_and_smallest_of_each(cl,di,sp)
+  def playable(@di,@he,{cl,di,[],sp}, _played), do: all_and_smallest_of_each(di,cl,sp)
+  def playable(@he,@he,{cl,di,[],sp}, _played), do:         smallest_of_each(cl,di,sp)
+  def playable(@sp,@he,{cl,di,[],sp}, _played), do: all_and_smallest_of_each(sp,cl,di)
+  def playable(_,  @he,{_c,_d,he,_s},  played), do: all_larger_and_smallest(@he, played, he)
 
-  def playable(@cl,    @sp, {cl,di,he,[]}, _played), do: all_and_smallest_of_each(cl,di,he)
-  def playable(@di,    @sp, {cl,di,he,[]}, _played), do: all_and_smallest_of_each(di,cl,he)
-  def playable(@he,    @sp, {cl,di,he,[]}, _played), do: all_and_smallest_of_each(he,cl,di)
-  def playable(@sp,    @sp, {cl,di,he,[]}, _played), do:         smallest_of_each(cl,di,he)
-  def playable(_trumps,@sp, {_c,_d,_h,sp},  played), do: all_larger_and_smallest(@sp, played, sp)
+  def playable(@cl,@sp,{cl,di,he,[]}, _played), do: all_and_smallest_of_each(cl,di,he)
+  def playable(@di,@sp,{cl,di,he,[]}, _played), do: all_and_smallest_of_each(di,cl,he)
+  def playable(@he,@sp,{cl,di,he,[]}, _played), do: all_and_smallest_of_each(he,cl,di)
+  def playable(@sp,@sp,{cl,di,he,[]}, _played), do:         smallest_of_each(cl,di,he)
+  def playable(_,  @sp,{_c,_d,_h,sp},  played), do: all_larger_and_smallest(@sp, played, sp)
 
   def remove_card({cl,di,he,sp}, card = {@cl, _}), do: {List.delete(cl,card),di,he,sp}
   def remove_card({cl,di,he,sp}, card = {@di, _}), do: {cl,List.delete(di,card),he,sp}
@@ -323,121 +320,96 @@ defmodule Bridge do # {
   def score_hand([{_,      _play}|rest], n_s), do: score_hand(rest, n_s)
 
 
-  def controlling(leader, agents, num_plays, plays) do
-    receive do
-      {:add, aPlay} ->
-        #IO.puts "controlling.add"
-        #case rem(num_plays, 100000) do
-        #  0 -> IO.write "#{num_plays}\r"
-        #  _ -> nil
-        #end
-        score = score_hand(aPlay, 0)
-        #IO.puts " score = #{score}"
-        new_plays = add_to_play(leader, {score, aPlay}, plays)
-        controlling(leader, agents, num_plays + 1, new_plays)
-      {:give, sender} ->
-        #IO.puts "controlling got give"
-        send sender, {:give, num_plays, plays}
-        controlling(leader, agents, num_plays, plays)
-      {:DOWN, _, _, _, _} ->
-        IO.puts "end #{agents}"
-        case agents do
-          1 -> plays
-          _ -> controlling(leader, agents - 1, num_plays, plays)
-        end
-      {:starter, function, args} ->
-        IO.puts "start #{agents}"
-        spawn_monitor(Bridge, function, args)
-        controlling(leader, agents + 1, num_plays, plays)
-      {:agents, sender} ->
-        #IO.puts "agents got :agents"
-        send sender, {:agents, agents}
-        controlling(leader, agents, num_plays, plays)
-    end
-  end
-
   #
   # rotate h1 - h4 relative to winner
   # 
-  def play_winner(control, h1, h2, h3, h4, trumps, leader, winner, round, hand) when winner == leader do
-    play(control, h1, h2, h3, h4, trumps, winner, nil, round, @nt, 0, hand, [])
+  def play_winner(h1, h2, h3, h4, trumps, leader, winner, round, hand) when winner == leader do
+    play(h1, h2, h3, h4, trumps, winner, nil, round, @nt, 0, hand, [])
   end
-  def play_winner(control, h1, h2, h3, h4, trumps, leader, winner, round, hand) when winner > leader do
-    play_winner(control, h2, h3, h4, h1, trumps, leader + 1, winner, round, hand)
+  def play_winner(h1, h2, h3, h4, trumps, leader, winner, round, hand) when winner > leader do
+    play_winner(h2, h3, h4, h1, trumps, leader + 1, winner, round, hand)
   end
-  def play_winner(control, h1, h2, h3, h4, trumps, leader, winner, round, hand) when leader > winner do
-    play_winner(control, h4, h1, h2, h3, trumps, leader - 1, winner, round, hand)
-  end
-
-  def play1(control, h1, h2, h3, h4, trumps, leader) do
-    play2(control, h1, h2, h3, h4, trumps, leader, playable(trumps, @nt, h1, []), 0, @nt, 0, [], [])
+  def play_winner(h1, h2, h3, h4, trumps, leader, winner, round, hand) when leader > winner do
+    play_winner(h4, h1, h2, h3, trumps, leader - 1, winner, round, hand)
   end
 
-  def play2(_control, _h1, _h2, _h3, _h4, _trumps, leader, [], _round, _lead_suit, _position, _hand, _played), do: leader
+  def play1(h1, h2, h3, h4, trumps, leader) do
+    IO.puts "play1 A"
+    play2(h1, h2, h3, h4, trumps, leader, playable(trumps, @nt, h1, []), 0, @nt, 0, [], [])
+  end
 
-  def play2(control, h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
+  def play2(_h1, _h2, _h3, _h4, _trumps, leader, [], _round, _lead_suit, _position, _hand, _played), do: (
+    IO.puts "play2 B"
+    nil
+  )
+
+  def play2(h1, h2, h3, h4, trumps, leader, [card = {lead_suit, _}|rest], round, @nt, position, hand, played) do # {
+    IO.puts "play2 A #{inspect self()}"
     new_h1 = remove_card(h1, card)
-    send control, {:starter, :play, [control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
-    #play(control, h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played])
+    send self(), {:starter, :play, [h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played]]}
+    #play(h2, h3, h4, new_h1, trumps, leader, nil, 0, lead_suit, position + 1, hand, [card|played])
 
-    play2(control, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
+    play2(h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
   end # }
 
   #
   # template
   #
-  def play(control, h1, h2, h3, h4, trumps, leader, playable\\nil, round\\0, lead_suit\\@nt, position\\0, hand\\[], played\\[])
+  def play(h1, h2, h3, h4, trumps, leader, playable\\nil, round\\0, lead_suit\\@nt, position\\0, hand\\[], played\\[])
 
   #
   # end of play ... return reversed play
   # 
-  def play(control, _h1, _h2, _h3, _h4, _trumps, _leader, _playable, @deck_size, _lead_suit, _position, hand, _played) do
-    send control, {:add, reverse(hand)}
+  def play(_h1, _h2, _h3, _h4, _trumps, _leader, _playable, @deck_size, _lead_suit, _position, hand, _played) do
+    #IO.puts "play() before send :add"
+    send self(), {:add, reverse(hand)}
   end
 
   #
   # end of one round
   #
-  def play(control, h1, h2, h3, h4, trumps, leader, _playable, round, _lead_suit, 4, hand, played) do # {
+  def play(h1, h2, h3, h4, trumps, leader, _playable, round, _lead_suit, 4, hand, played) do # {
+    #IO.puts "play() end of one round"
+    send self(), {:add, reverse(hand)}
     played = reverse(played)
     {_card, winner} = wins(trumps, played)
     winner = rem(leader + winner, 4)
-    play_winner(control, h1, h2, h3, h4, trumps, leader, winner, round + 1, [{winner, played} | hand])
+    play_winner(h1, h2, h3, h4, trumps, leader, winner, round + 1, [{winner, played} | hand])
   end # }
 
   #
-  # what is this ... ??
+  # what is this ... the end of playing playable() cards
   #
-  def play(_control, _h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
+  def play(_h1, _h2, _h3, _h4, _trumps, _leader, [], _round, _lead_suit, _position, _hand, _played), do: nil
 
   #
   # When playable is nil it means get list of playable cards appropriate to the card lead (= @nt if this is the lead)
   #
-  def play(control, h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
+  def play(h1, h2, h3, h4, trumps, leader, nil, round, lead_suit, position, hand, played) do # {
     #IO.puts "play A #{round} #{position}"
-    play(control, h1, h2, h3, h4, trumps, leader, playable(trumps, lead_suit, h1, played), round, lead_suit, position, hand, played)
+    play(h1, h2, h3, h4, trumps, leader, playable(trumps, lead_suit, h1, played), round, lead_suit, position, hand, played)
   end # }
 
   #
   # Lead a card
   #
-  def play(control, h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
+  def play(h1, h2, h3, h4, trumps, leader, [card|rest], round, @nt, position, hand, played) do # {
     {lead_suit, _} = card
     #IO.puts "play B #{round} #{position} #{cardStr(card)}"
     new_h1 = remove_card(h1, card)
-    play(control, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
+    play(h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
 
-    play(control, h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
+    play(h1, h2, h3, h4, trumps, leader, rest, round, @nt, position,     hand, played)
   end # }
 
   #
   # Play a card to a lead
   #
-  def play(control, h1, h2, h3, h4, trumps, leader, [card|rest], round, lead_suit, position, hand, played) do # {
+  def play(h1, h2, h3, h4, trumps, leader, [card|rest], round, lead_suit, position, hand, played) do # {
     #IO.puts "play C #{round} #{position} #{cardStr(card)}"
     new_h1 = remove_card(h1, card)
-    play(control, h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
-    play(control, h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
+    play(h2, h3, h4, new_h1, trumps, leader, nil, round, lead_suit, position + 1, hand, [card|played])
+    play(h1, h2, h3, h4, trumps, leader, rest, round, lead_suit, position,     hand, played)
   end # }
 
   def player([{nh, _}, {eh, _}, {sh, _}, {wh, _}], declarer, trumps) do # {
@@ -445,13 +417,13 @@ defmodule Bridge do # {
     # create a process to receive hand plays
     #
 
-    leader = case declarer do
-      @north -> play1(self(), eh, sh, wh, nh, trumps, @east)
-      @east  -> play1(self(), sh, wh, nh, eh, trumps, @south)
-      @south -> play1(self(), wh, nh, eh, sh, trumps, @west)
-      @west  -> play1(self(), nh, eh, sh, wh, trumps, @north)
+    case declarer do
+      @north -> play1(eh, sh, wh, nh, trumps, @east)
+      @east  -> play1(sh, wh, nh, eh, trumps, @south)
+      @south -> play1(wh, nh, eh, sh, trumps, @west)
+      @west  -> play1(nh, eh, sh, wh, trumps, @north)
     end
-    controlling(leader, 0, 0, nil)
+    nil
   end # }
 
   def showPlay([]), do: IO.write ") "
@@ -476,12 +448,16 @@ defmodule Bridge do # {
   end
 
   def do_one() do
+    IO.puts "do_one()"
     :rand.seed(:exrop, {1, 2, 3})
+    IO.puts "A"
+    send self(), {:leader, @east}
+    IO.puts "B"
     hand =  deal()
-    show(hand)
-    {times, {ns, play}} = :timer.tc(fn -> player(hand, north(), spades()) end)
+#    show(hand)
+    {times, _value} = :timer.tc(fn -> player(hand, @north, @sp) end)
     IO.puts "that took #{times} "
-    IO.write "NS = #{ns} "
-    showHand(@east, play)
+#    IO.write "NS = #{ns} "
+#    showHand(@east, play)
   end
 end # }
