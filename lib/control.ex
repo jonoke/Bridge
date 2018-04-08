@@ -5,21 +5,23 @@ defmodule Control do # {
 
   def controlling(leader\\0, agents\\0, num_plays\\0, plays\\nil)
 
-  def controlling(leader, agents, num_plays, plays) do
-    #IO.puts "#{Node.self()} => controlling(#{leader}, #{agents}, #{num_plays}, plays)"
+  def controlling(leader,    agents,    num_plays,    plays) do
+    IO.puts "#{Node.self()} => controlling(#{agents}, #{num_plays}, plays)"
     receive do
-      {:leader, theLeader} ->
-        controlling(theLeader, agents, num_plays, plays)
       {:add, aPlay} ->
-        IO.puts "controlling.add"
-        #case rem(num_plays, 100000) do
-        #  0 -> IO.write "#{num_plays}\r"
-        #  _ -> nil
-        #end
-        score = Bridge.score_hand(aPlay, 0)
-        #IO.puts " score = #{score}"
-        new_plays = Bridge.add_to_play(leader, {score, aPlay}, plays)
+        #IO.puts "controlling.add"
+#        case rem(num_plays, 100000) do
+#          0 -> IO.puts "#{num_plays}\r"
+#          _ -> nil
+#        end
+        new_plays = Bridge.add_to_play(leader, aPlay, plays)
         controlling(leader, agents, num_plays + 1, new_plays)
+      {:show, leader} ->
+        {ns, plays} = plays
+        IO.puts "Total = #{num_plays}"
+        IO.puts "NS score = #{ns}"
+        Bridge.showHand(leader, plays)
+        controlling(leader, agents - 1, num_plays, plays)
       {:DOWN, _, _, _, _} ->
         IO.puts "end #{agents}"
         controlling(leader, agents - 1, num_plays, plays)
@@ -27,13 +29,32 @@ defmodule Control do # {
         IO.puts "start #{Node.self()} #{agents}"
         spawn_monitor(Bridge, function, args)
         controlling(leader, agents + 1, num_plays, plays)
-      {:do} ->
+      {:do, controls} ->
         IO.puts "controlling do #{inspect self()}"
-        Bridge.do_one()
+        IO.inspect controls
+        Bridge.do_one(controls)
+        IO.puts ""
         controlling(leader, agents, num_plays, plays)
       {msg} ->
         IO.puts "got msg?"
         IO.inspect msg
+        controlling(leader, agents, num_plays, plays)
+    end
+  end
+  def setup(nodes, pids\\[])
+  def setup([], pids) do
+    pids
+  end
+  def setup([hd|tl], pids) do
+    case Node.connect(hd) do
+      true ->
+        IO.puts "Node.connect(#{hd}) is true"
+        pid = Node.spawn(hd, Control, :controlling, [])
+        IO.puts "node #{hd} pid = #{inspect(pid)}"
+        setup(tl, [pid|pids])
+      false ->
+        IO.puts "node #{hd} no connect"
+        setup(tl, pids)
     end
   end
 end # }
