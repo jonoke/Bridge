@@ -6,7 +6,7 @@ defmodule Control do # {
   def controlling(leader\\0, agents\\0, num_plays\\0, plays\\nil)
 
   def controlling(leader,    agents,    num_plays,    plays) do
-    IO.puts "#{Node.self()} => controlling(#{agents}, #{num_plays}, plays)"
+#    IO.puts "#{Node.self()} => controlling(#{agents}, #{num_plays}, plays)"
     receive do
       {:add, aPlay} ->
         #IO.puts "controlling.add"
@@ -21,7 +21,7 @@ defmodule Control do # {
         IO.puts "Total = #{num_plays}"
         IO.puts "NS score = #{ns}"
         Bridge.showHand(leader, plays)
-        controlling(leader, agents - 1, num_plays, plays)
+        controlling(leader, agents, num_plays, plays)
       {:DOWN, _, _, _, _} ->
         IO.puts "end #{agents}"
         controlling(leader, agents - 1, num_plays, plays)
