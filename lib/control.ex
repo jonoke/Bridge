@@ -56,14 +56,28 @@ defmodule Control do # {
         setup(tl, pids)
     end
   end
-  def do_one() do
+  def do_one_arch() do
     IO.puts "#{Time.to_string(Time.utc_now())}"
     controls = [one] = setup([:one@arch])
     send one,{:do,controls}
+    {one}
+  end
+  def do_one_laptop() do
+    IO.puts "#{Time.to_string(Time.utc_now())}"
+    controls = [one] = setup([:one@laptop])
+    send one,{:do,controls}
+    {one}
   end
   def do_two() do
     IO.puts "#{Time.to_string(Time.utc_now())}"
-    controls = [one] = setup([:one@arch, :one@laptop])
+    controls = [one,two] = setup([:one@arch, :one@laptop])
     send one,{:do,controls}
+    {one,two}
+  end
+  def do_three() do
+    IO.puts "#{Time.to_string(Time.utc_now())}"
+    controls = [one,two,three] = setup([:one@arch, :one@arch, :one@laptop])
+    send one,{:do,controls}
+    {one,two,three}
   end
 end # }
