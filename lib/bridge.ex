@@ -444,10 +444,6 @@ defmodule Bridge do # {
   end
 
   def do_one(pid_list) do
-    IO.puts "---do_one()"
-    IO.inspect pid_list
-    IO.puts "---"
-
     :rand.seed(:exrop, {1, 2, 3})
     hand =  deal()
     show(hand)

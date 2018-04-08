@@ -23,18 +23,17 @@ defmodule Control do # {
         Bridge.showHand(leader, plays)
         controlling(leader, agents, num_plays, plays)
       {:DOWN, _, _, _, _} ->
-        IO.puts "end #{Node.self()} #{agents}"
-        IO.puts "#{Time.to_string(Time.utc_now())}
+        case agents do
+          1 -> IO.puts "end #{Node.self()} #{agents} at #{Time.to_string(Time.utc_now())}"
+          _ -> IO.puts "end #{Node.self()} #{agents}"
+        end
         controlling(leader, agents - 1, num_plays, plays)
       {:starter, function, args} ->
         IO.puts "start #{Node.self()} #{agents}"
         spawn_monitor(Bridge, function, args)
         controlling(leader, agents + 1, num_plays, plays)
       {:do, controls} ->
-        IO.puts "controlling do #{inspect self()}"
-        IO.inspect controls
         Bridge.do_one(controls)
-        IO.puts ""
         controlling(leader, agents, num_plays, plays)
       {msg} ->
         IO.puts "got msg?"
@@ -51,7 +50,6 @@ defmodule Control do # {
       true ->
         IO.puts "Node.connect(#{hd}) is true"
         pid = Node.spawn(hd, Control, :controlling, [])
-        IO.puts "node #{hd} pid = #{inspect(pid)}"
         setup(tl, [pid|pids])
       false ->
         IO.puts "node #{hd} no connect"
@@ -59,8 +57,13 @@ defmodule Control do # {
     end
   end
   def do_one() do
-    IO.puts "#{Time.to_string(Time.utc_now())}
+    IO.puts "#{Time.to_string(Time.utc_now())}"
     controls = [one] = setup([:one@arch])
+    send one,{:do,controls}
+  end
+  def do_two() do
+    IO.puts "#{Time.to_string(Time.utc_now())}"
+    controls = [one] = setup([:one@arch, :one@laptop])
     send one,{:do,controls}
   end
 end # }
