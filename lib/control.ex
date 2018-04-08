@@ -23,7 +23,8 @@ defmodule Control do # {
         Bridge.showHand(leader, plays)
         controlling(leader, agents, num_plays, plays)
       {:DOWN, _, _, _, _} ->
-        IO.puts "end #{agents}"
+        IO.puts "end #{Node.self()} #{agents}"
+        IO.puts "#{Time.to_string(Time.utc_now())}
         controlling(leader, agents - 1, num_plays, plays)
       {:starter, function, args} ->
         IO.puts "start #{Node.self()} #{agents}"
@@ -43,7 +44,7 @@ defmodule Control do # {
   end
   def setup(nodes, pids\\[])
   def setup([], pids) do
-    pids
+    Enum.reverse(pids)
   end
   def setup([hd|tl], pids) do
     case Node.connect(hd) do
@@ -56,5 +57,10 @@ defmodule Control do # {
         IO.puts "node #{hd} no connect"
         setup(tl, pids)
     end
+  end
+  def do_one() do
+    IO.puts "#{Time.to_string(Time.utc_now())}
+    controls = [one] = setup([:one@arch])
+    send one,{:do,controls}
   end
 end # }
